@@ -1,0 +1,50 @@
+name: Dependabot Auto-Merge
+
+on:
+  workflow_run:
+    workflows:
+      - Validate
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Auto-merge Dependabot PR
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Find Dependabot PR
+        id: pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const branch = context.payload.workflow_run.head_branch;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const { data: pulls } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              head: `${owner}:${branch}`,
+            });
+            const pr = pulls.find((item) => item.user.login === "dependabot[bot]");
+            if (!pr) {
+              core.info(`No open Dependabot PR found for ${branch}`);
+              return;
+            }
+            core.setOutput("number", String(pr.number));
+            core.setOutput("url", pr.html_url);
+
+      - name: Merge Dependabot PR
+        if: steps.pr.outputs.number != ''
+        run: gh pr merge "$PR_URL" --squash --delete-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.pr.outputs.url }}

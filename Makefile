@@ -6,8 +6,13 @@ SPK_ROOT := build/spk-root
 PACKAGE_ROOT := build/package-root
 DIST_DIR := dist
 SPK_FILE := $(DIST_DIR)/$(PKG_NAME)-$(PKG_VERSION).spk
+COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo ""; fi)
 
-.PHONY: spk spk-clean spk-structure spk-validate
+.PHONY: run spk spk-clean spk-structure spk-validate
+
+run:
+	@if [ -z "$(COMPOSE)" ]; then echo "Docker Compose was not found." >&2; exit 1; fi
+	$(COMPOSE) -f docker-compose.yml up -d --build
 
 spk: spk-clean spk-structure spk-validate
 	tar -C $(PACKAGE_ROOT) -czf $(SPK_ROOT)/package.tgz .
