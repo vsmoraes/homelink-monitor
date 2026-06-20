@@ -68,6 +68,76 @@ npm run build
 
 Backend tests use real temporary SQLite databases and `httptest`. They do not use mock frameworks.
 
+## CI/CD
+
+GitHub Actions workflows live in `.github/workflows`.
+
+### Pull Request And Main Validation
+
+`Validate` runs on pull requests to `main` and pushes to `main`.
+
+It validates the monorepo in separate jobs:
+
+- `API`: sets up Go from `services/api/go.mod`, checks `gofmt`, checks `go mod tidy`, runs `go vet ./...`, and runs `go test ./...`.
+- `Web`: sets up Node 24, installs with `npm ci`, runs frontend tests, and builds the Vite app.
+- `Container`: validates `docker-compose.yml` and builds the production Docker image without pushing it.
+
+The workflow uses per-project dependency caches and cancels older in-progress validation runs for the same branch.
+
+### Releases
+
+`Release` runs on pushes to `main` and uses Release Please.
+
+Use Conventional Commit messages such as:
+
+```text
+feat(api): add outage classifier
+fix(web): show settings save errors
+chore: update docker metadata
+```
+
+Release Please opens or updates a release PR. When that PR is merged, it creates:
+
+- `CHANGELOG.md`
+- a git tag such as `v0.2.0`
+- a GitHub Release
+
+The starting release version is tracked in `.release-please-manifest.json`.
+
+### Container Publishing
+
+`Publish Container` runs when a GitHub Release is published. It builds the production image and pushes it to GitHub Container Registry:
+
+```text
+ghcr.io/OWNER/REPOSITORY
+```
+
+Release builds publish:
+
+- the release tag, for example `v0.2.0`
+- `latest` for non-prerelease releases
+
+The workflow can also be run manually with a custom image tag.
+
+### Dependency Updates
+
+Dependabot is configured for:
+
+- GitHub Actions
+- Go modules in `services/api`
+- npm packages in `apps/web`
+- Docker base images at the repository root
+
+### Required GitHub Settings
+
+Recommended repository settings:
+
+- Protect `main`.
+- Require the `Validate` workflow before merging.
+- Use squash or rebase merges to keep a readable conventional commit history.
+- Allow GitHub Actions to create pull requests so Release Please can manage release PRs.
+- Keep package write permissions enabled for GitHub Actions if publishing to GHCR.
+
 ## Docker Compose
 
 Set the initial admin credentials before the first run. They are only used when the database has no users yet:
