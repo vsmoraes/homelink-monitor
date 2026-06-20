@@ -1,3 +1,14 @@
 {
-  "usr-local-linker": {}
+  "docker-project": {
+    "projects": [
+      {
+        "name": "homelink-monitor",
+        "path": "project",
+        "build_params": {
+          "build": true,
+          "force_recreate": true
+        }
+      }
+    ]
+  }
 }

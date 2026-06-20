@@ -15,14 +15,15 @@ run:
 	$(COMPOSE) -f docker-compose.yml up -d --build
 
 spk: spk-clean spk-structure spk-validate
-	tar -C $(PACKAGE_ROOT) -czf $(SPK_ROOT)/package.tgz .
+	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf $(SPK_ROOT)/package.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project
 	mkdir -p $(DIST_DIR)
-	tar -C $(SPK_ROOT) -cf $(SPK_FILE) .
+	COPYFILE_DISABLE=1 tar --format ustar -C $(SPK_ROOT) -cf $(SPK_FILE) INFO package.tgz conf scripts WIZARD_UIFILES
 	@echo "Created $(SPK_FILE)"
 
 spk-clean:
 	rm -rf $(SPK_ROOT) $(PACKAGE_ROOT)
-	@echo "Removed generated SPK build roots. Existing files in $(DIST_DIR)/ are preserved."
+	rm -f $(DIST_DIR)/$(PKG_NAME)-*.spk
+	@echo "Removed generated SPK build roots and generated $(PKG_NAME) SPK files."
 
 spk-structure:
 	test -n "$(PKG_VERSION)"
@@ -32,7 +33,8 @@ spk-structure:
 	cp synology/scripts/preinst synology/scripts/postinst synology/scripts/preuninst synology/scripts/postuninst synology/scripts/start-stop-status $(SPK_ROOT)/scripts/
 	cp synology/conf/privilege synology/conf/resource $(SPK_ROOT)/conf/
 	cp synology/WIZARD_UIFILES/install_uifile $(SPK_ROOT)/WIZARD_UIFILES/
-	cp synology/templates/docker-compose.yml $(PACKAGE_ROOT)/docker-compose.yml
+	mkdir -p $(PACKAGE_ROOT)/project
+	cp synology/templates/docker-compose.yml $(PACKAGE_ROOT)/project/compose.yml
 	cp synology/templates/app.env.template $(PACKAGE_ROOT)/.env.template
 	cp synology/notification-helper.sh $(PACKAGE_ROOT)/notification-helper.sh
 	cp synology/README.SYNOLOGY.md $(PACKAGE_ROOT)/README.SYNOLOGY.md
@@ -42,7 +44,7 @@ spk-structure:
 	chmod 755 $(PACKAGE_ROOT)/notification-helper.sh $(PACKAGE_ROOT)/scripts/start-stop-status
 	if [ -f synology/PACKAGE_ICON.PNG ]; then cp synology/PACKAGE_ICON.PNG $(SPK_ROOT)/PACKAGE_ICON.PNG; else printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=' | base64 -d > $(SPK_ROOT)/PACKAGE_ICON.PNG 2>/dev/null || printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=' | base64 -D > $(SPK_ROOT)/PACKAGE_ICON.PNG; fi
 	if [ -f synology/PACKAGE_ICON_256.PNG ]; then cp synology/PACKAGE_ICON_256.PNG $(SPK_ROOT)/PACKAGE_ICON_256.PNG; else cp $(SPK_ROOT)/PACKAGE_ICON.PNG $(SPK_ROOT)/PACKAGE_ICON_256.PNG; fi
-	mkdir -p $(PACKAGE_ROOT)/source
+	mkdir -p $(PACKAGE_ROOT)/project/source
 	tar \
 		--exclude='.git' \
 		--exclude='build' \
@@ -54,7 +56,7 @@ spk-structure:
 		--exclude='*.spk' \
 		--exclude='apps/web/node_modules' \
 		--exclude='apps/web/dist' \
-		-cf - Dockerfile .dockerignore apps services | tar -C $(PACKAGE_ROOT)/source -xf -
+		-cf - Dockerfile .dockerignore apps services | tar -C $(PACKAGE_ROOT)/project/source -xf -
 
 spk-validate:
 	test -f synology/INFO
@@ -68,13 +70,13 @@ spk-validate:
 	test -x $(SPK_ROOT)/scripts/preuninst
 	test -x $(SPK_ROOT)/scripts/postuninst
 	test -x $(SPK_ROOT)/scripts/start-stop-status
-	test -f $(PACKAGE_ROOT)/docker-compose.yml
+	test -f $(PACKAGE_ROOT)/project/compose.yml
 	test -f $(PACKAGE_ROOT)/.env.template
 	test -x $(PACKAGE_ROOT)/notification-helper.sh
 	test -f $(SPK_ROOT)/WIZARD_UIFILES/install_uifile
 	test ! -f $(PACKAGE_ROOT)/app.env
 	test ! -f $(PACKAGE_ROOT)/.env
-	test ! -f $(PACKAGE_ROOT)/source/.env
+	test ! -f $(PACKAGE_ROOT)/project/source/.env
 	! find $(PACKAGE_ROOT) $(SPK_ROOT) -type f ! -path '*/scripts/*' ! -name '.env.template' ! -name 'README.SYNOLOGY.md' -exec grep -E 'ADMIN_PASSWORD=[^_[:space:]]' {} +
 	sh -n synology/scripts/preinst
 	sh -n synology/scripts/postinst
@@ -82,7 +84,7 @@ spk-validate:
 	sh -n synology/scripts/postuninst
 	sh -n synology/scripts/start-stop-status
 	sh -n synology/notification-helper.sh
-	tar -C $(PACKAGE_ROOT) -czf /tmp/$(PKG_NAME)-package-validate.tgz .
+	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf /tmp/$(PKG_NAME)-package-validate.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project
 	rm -f /tmp/$(PKG_NAME)-package-validate.tgz
 	mkdir -p $(DIST_DIR)
 	@echo "SPK structure validation passed."

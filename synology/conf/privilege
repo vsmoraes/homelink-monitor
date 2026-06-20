@@ -2,6 +2,5 @@
   "defaults": {
     "run-as": "package"
   },
-  "username": "homelink-monitor",
-  "join-groupname": "docker"
+  "username": "homelinkmonitor"
 }

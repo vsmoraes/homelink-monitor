@@ -10,37 +10,15 @@ LOG_DIR="$PKG_VAR/logs"
 HELPER="$PKG_DEST/notification-helper.sh"
 HELPER_PID="$PKG_VAR/notification-helper.pid"
 
-fail() {
-  echo "$1" >&2
-  exit 1
-}
-
-compose_cmd() {
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    echo "docker compose"
-    return 0
-  fi
-  if command -v docker-compose >/dev/null 2>&1; then
-    echo "docker-compose"
-    return 0
-  fi
-  return 1
-}
-
-require_docker() {
-  command -v docker >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
-  docker info >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
-}
-
 is_running() {
+  command -v docker >/dev/null 2>&1 || return 1
   [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)" = "true" ]
 }
 
 start_helper() {
   [ -f "$APP_ENV" ] || return 0
-  # shellcheck disable=SC1090
-  . "$APP_ENV"
-  case "${DSM_NOTIFICATIONS_ENABLED:-true}" in
+  notifications_enabled="$(sed -n 's/^DSM_NOTIFICATIONS_ENABLED=//p' "$APP_ENV" | tail -n 1)"
+  case "${notifications_enabled:-true}" in
     true|1|yes|on) ;;
     *) return 0 ;;
   esac
@@ -64,30 +42,21 @@ stop_helper() {
 }
 
 case "${1:-}" in
+  prestart|prestop)
+    exit 0
+    ;;
   start)
-    require_docker
-    [ -f "$APP_ENV" ] || fail "Missing configuration file: $APP_ENV"
-    COMPOSE="$(compose_cmd)" || fail "Docker Compose was not found. Install or enable Synology Container Manager / Docker Compose support."
     mkdir -p "$LOG_DIR"
-    cd "$PKG_DEST"
-    $COMPOSE --env-file "$APP_ENV" up -d
     start_helper
     ;;
   stop)
     stop_helper
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-      if COMPOSE="$(compose_cmd 2>/dev/null)"; then
-        cd "$PKG_DEST"
-        $COMPOSE --env-file "$APP_ENV" down --remove-orphans || true
-      fi
-    fi
     ;;
   status)
-    require_docker
     if is_running; then
       exit 0
     fi
-    exit 1
+    exit 3
     ;;
   log)
     echo "$LOG_DIR/notification-helper.log"

@@ -13,24 +13,6 @@ fail() {
   exit 1
 }
 
-compose_cmd() {
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    echo "docker compose"
-    return 0
-  fi
-  if command -v docker-compose >/dev/null 2>&1; then
-    echo "docker-compose"
-    return 0
-  fi
-  return 1
-}
-
-require_docker() {
-  command -v docker >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
-  docker info >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
-  compose_cmd >/dev/null 2>&1 || fail "Docker Compose was not found. Install or enable Synology Container Manager / Docker Compose support."
-}
-
 value_from_wizard() {
   key="$1"
   upper_key="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')"
@@ -69,6 +51,15 @@ ADMIN_PASSWORD_CONFIRM="$(value_from_wizard wizard_admin_password_confirm || pri
 HTTP_PORT="$(value_from_wizard wizard_http_port || printf '%s' "${HTTP_PORT:-8810}")"
 DSM_NOTIFICATIONS_ENABLED="$(value_from_wizard wizard_dsm_notifications_enabled || printf '%s' "${DSM_NOTIFICATIONS_ENABLED:-true}")"
 
+if [ -z "$ADMIN_PASSWORD" ]; then
+  if command -v openssl >/dev/null 2>&1; then
+    ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+  else
+    ADMIN_PASSWORD="$(date +%s | sha256sum | awk '{print $1}')"
+  fi
+  ADMIN_PASSWORD_CONFIRM="$ADMIN_PASSWORD"
+fi
+
 [ -n "$ADMIN_USERNAME" ] || fail "Admin username cannot be empty."
 [ -n "$ADMIN_PASSWORD" ] || fail "Admin password cannot be empty."
 [ "$ADMIN_PASSWORD" = "$ADMIN_PASSWORD_CONFIRM" ] || fail "Admin password confirmation does not match."
@@ -79,7 +70,6 @@ case "$DSM_NOTIFICATIONS_ENABLED" in
 esac
 
 [ -f "$TEMPLATE" ] || fail "Missing app env template: $TEMPLATE"
-require_docker
 
 mkdir -p "$PKG_VAR/data" "$CONFIG_DIR" "$PKG_VAR/events/outbox" "$PKG_VAR/events/processed" "$PKG_VAR/events/failed" "$PKG_VAR/logs"
 
