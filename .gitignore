@@ -1,0 +1,16 @@
+.cache/
+
+# Go
+services/api/server
+services/api/*.db
+services/api/*.db-*
+
+# Frontend
+apps/web/node_modules/
+apps/web/dist/
+
+# Runtime data
+data/
+
+# OS/editor
+.DS_Store
