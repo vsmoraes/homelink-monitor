@@ -1,0 +1,86 @@
+[
+  {
+    "step_title": "HomeLink Monitor setup",
+    "items": [
+      {
+        "type": "textfield",
+        "desc": "Admin username",
+        "subitems": [
+          {
+            "key": "wizard_admin_username",
+            "desc": "Username",
+            "defaultValue": "admin",
+            "validator": {
+              "allowBlank": false
+            }
+          }
+        ]
+      },
+      {
+        "type": "password",
+        "desc": "Admin password",
+        "subitems": [
+          {
+            "key": "wizard_admin_password",
+            "desc": "Password",
+            "validator": {
+              "allowBlank": false
+            }
+          }
+        ]
+      },
+      {
+        "type": "password",
+        "desc": "Confirm admin password",
+        "subitems": [
+          {
+            "key": "wizard_admin_password_confirm",
+            "desc": "Confirm password",
+            "validator": {
+              "allowBlank": false,
+              "equalTo": "wizard_admin_password"
+            }
+          }
+        ]
+      },
+      {
+        "type": "textfield",
+        "desc": "HTTP port",
+        "subitems": [
+          {
+            "key": "wizard_http_port",
+            "desc": "Port",
+            "defaultValue": "8810",
+            "validator": {
+              "allowBlank": false,
+              "regex": "^[0-9]+$",
+              "min": 1024,
+              "max": 65535
+            }
+          }
+        ]
+      },
+      {
+        "type": "singleselect",
+        "desc": "DSM notifications",
+        "subitems": [
+          {
+            "key": "wizard_dsm_notifications_enabled",
+            "desc": "Enable DSM notifications",
+            "defaultValue": "true",
+            "values": [
+              {
+                "key": "true",
+                "value": "Enabled"
+              },
+              {
+                "key": "false",
+                "value": "Disabled"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

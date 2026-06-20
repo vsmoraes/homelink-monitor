@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+PKG_NAME="homelink-monitor"
+
+echo "Preparing to install HomeLink Monitor."
+echo "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
+
+if [ "${SYNOPKG_PKGNAME:-$PKG_NAME}" != "$PKG_NAME" ]; then
+  echo "Unexpected package name: ${SYNOPKG_PKGNAME:-unknown}" >&2
+  exit 1
+fi
+
+exit 0

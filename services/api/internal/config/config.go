@@ -3,22 +3,26 @@ package config
 import "os"
 
 type Config struct {
-	Addr          string
-	DBPath        string
-	StaticPath    string
-	AppEnv        string
-	AdminUsername string
-	AdminPassword string
+	Addr                    string
+	DBPath                  string
+	StaticPath              string
+	AppEnv                  string
+	AdminUsername           string
+	AdminPassword           string
+	EventOutboxDir          string
+	DSMNotificationsEnabled bool
 }
 
 func Load() Config {
 	return Config{
-		Addr:          value("ADDR", ":8080"),
-		DBPath:        value("DB_PATH", "./connection-monitor.db"),
-		StaticPath:    value("STATIC_PATH", "../../apps/web/dist"),
-		AppEnv:        value("APP_ENV", "development"),
-		AdminUsername: value("ADMIN_USERNAME", "admin"),
-		AdminPassword: value("ADMIN_PASSWORD", "changeme"),
+		Addr:                    value("ADDR", ":8080"),
+		DBPath:                  value("DB_PATH", "./connection-monitor.db"),
+		StaticPath:              value("STATIC_PATH", "../../apps/web/dist"),
+		AppEnv:                  value("APP_ENV", "development"),
+		AdminUsername:           value("ADMIN_USERNAME", "admin"),
+		AdminPassword:           value("ADMIN_PASSWORD", "changeme"),
+		EventOutboxDir:          os.Getenv("EVENT_OUTBOX_DIR"),
+		DSMNotificationsEnabled: boolValue("DSM_NOTIFICATIONS_ENABLED", false),
 	}
 }
 
@@ -27,4 +31,15 @@ func value(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func boolValue(key string, fallback bool) bool {
+	switch os.Getenv(key) {
+	case "1", "true", "TRUE", "yes", "YES", "on", "ON":
+		return true
+	case "0", "false", "FALSE", "no", "NO", "off", "OFF":
+		return false
+	default:
+		return fallback
+	}
 }

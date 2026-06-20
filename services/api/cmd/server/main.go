@@ -13,6 +13,7 @@ import (
 	"homelink-monitor/services/api/internal/auth"
 	"homelink-monitor/services/api/internal/config"
 	"homelink-monitor/services/api/internal/db"
+	"homelink-monitor/services/api/internal/events"
 	"homelink-monitor/services/api/internal/httpapi"
 	"homelink-monitor/services/api/internal/monitoring"
 	"homelink-monitor/services/api/internal/store"
@@ -39,6 +40,9 @@ func main() {
 		os.Exit(1)
 	}
 	monitor := monitoring.NewService(st, log)
+	if cfg.DSMNotificationsEnabled && cfg.EventOutboxDir != "" {
+		monitor = monitoring.NewServiceWithOutbox(st, log, events.NewOutbox(cfg.EventOutboxDir))
+	}
 	monitor.Start(ctx)
 
 	server := &http.Server{

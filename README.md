@@ -188,6 +188,20 @@ Default `.env.example` credentials are `admin` / `changeme123`. Change them befo
 
 Connection Monitor is designed to run as one container on Synology Container Manager. The Go API serves the React build, so you do not need Web Station, a separate nginx container, or a second frontend service.
 
+For a DSM Package Center install, build the Docker-backed SPK:
+
+```bash
+make spk
+```
+
+Then install:
+
+```text
+DSM Package Center -> Manual Install -> dist/homelink-monitor-<version>.spk
+```
+
+The SPK packaging files live under `synology/`, and detailed SPK build/install notes are in `synology/README.SYNOLOGY.md`.
+
 ### Recommended NAS Layout
 
 Use one parent directory for the app and one persistent directory for SQLite data:

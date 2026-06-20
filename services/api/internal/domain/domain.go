@@ -104,3 +104,12 @@ type User struct {
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
+
+type NotificationEvent struct {
+	ID        string    `json:"id"`
+	Severity  string    `json:"severity"`
+	Metric    string    `json:"metric"`
+	Title     string    `json:"title"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}

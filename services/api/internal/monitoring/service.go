@@ -2,12 +2,14 @@ package monitoring
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 	"sync"
 	"time"
 
 	"homelink-monitor/services/api/internal/domain"
+	"homelink-monitor/services/api/internal/events"
 	"homelink-monitor/services/api/internal/speedtest"
 	"homelink-monitor/services/api/internal/store"
 )
@@ -20,10 +22,17 @@ type Service struct {
 	speedActive bool
 	failMu      sync.Mutex
 	failCount   int
+	outbox      *events.Outbox
 }
 
 func NewService(st *store.Store, log *slog.Logger) *Service {
 	return &Service{store: st, log: log, speedRunner: speedtest.Runner{}}
+}
+
+func NewServiceWithOutbox(st *store.Store, log *slog.Logger, outbox *events.Outbox) *Service {
+	service := NewService(st, log)
+	service.outbox = outbox
+	return service
 }
 
 func (s *Service) SpeedRunning() bool {
@@ -61,6 +70,7 @@ func (s *Service) TriggerSpeedTest(_ context.Context) bool {
 		if _, err := s.store.InsertSpeedTest(context.Background(), result); err != nil {
 			s.log.Error("store speed test", "error", err)
 		}
+		s.emitSpeedTestEvent(context.Background(), result)
 	}()
 	return true
 }
@@ -129,19 +139,39 @@ func (s *Service) checkLatency(ctx context.Context, settings domain.Settings) {
 		if err != nil {
 			s.log.Error("store latency check", "error", err)
 		}
+		if !result.Success {
+			s.emit(ctx, domain.NotificationEvent{
+				ID:        fmt.Sprintf("latency-%s-%d", result.Target, result.CheckedAt.UnixNano()),
+				Severity:  "warning",
+				Metric:    "latency",
+				Title:     "Latency check failed",
+				Message:   fmt.Sprintf("Latency check to %s failed: %s", result.Target, result.Error),
+				Timestamp: result.CheckedAt,
+			})
+		}
 	}
 	s.updateOutage(ctx, settings, allFailed, anySuccess)
 }
 
 func (s *Service) checkDNS(ctx context.Context, settings domain.Settings) {
 	resolver := net.DefaultResolver
-	for _, domain := range settings.DNSDomains {
+	for _, name := range settings.DNSDomains {
 		start := time.Now()
-		_, err := resolver.LookupHost(ctx, domain)
+		_, err := resolver.LookupHost(ctx, name)
 		duration := float64(time.Since(start).Microseconds()) / 1000
-		result := domainCheck(domain, duration, err)
+		result := domainCheck(name, duration, err)
 		if _, err := s.store.InsertDNS(ctx, result); err != nil {
 			s.log.Error("store dns check", "error", err)
+		}
+		if !result.Success {
+			s.emit(ctx, domain.NotificationEvent{
+				ID:        fmt.Sprintf("dns-%s-%d", result.Domain, result.CheckedAt.UnixNano()),
+				Severity:  "warning",
+				Metric:    "dns",
+				Title:     "DNS check failed",
+				Message:   fmt.Sprintf("DNS lookup for %s failed: %s", result.Domain, result.Error),
+				Timestamp: result.CheckedAt,
+			})
 		}
 	}
 }
@@ -161,14 +191,69 @@ func (s *Service) updateOutage(ctx context.Context, settings domain.Settings, al
 	failCount := s.failCount
 	s.failMu.Unlock()
 	if ShouldOpenOutage(failCount, settings.OutageFailureThreshold, active != nil) {
-		if err := s.store.OpenOutage(ctx, time.Now().UTC(), "all latency targets failed"); err != nil {
+		now := time.Now().UTC()
+		if err := s.store.OpenOutage(ctx, now, "all latency targets failed"); err != nil {
 			s.log.Error("open outage", "error", err)
+		} else {
+			s.emit(ctx, domain.NotificationEvent{
+				ID:        fmt.Sprintf("outage-open-%d", now.UnixNano()),
+				Severity:  "critical",
+				Metric:    "outage",
+				Title:     "Connection outage detected",
+				Message:   "All configured latency targets failed.",
+				Timestamp: now,
+			})
 		}
 	}
 	if ShouldCloseOutage(anySuccess, active != nil) {
-		if err := s.store.CloseActiveOutage(ctx, time.Now().UTC()); err != nil {
+		now := time.Now().UTC()
+		if err := s.store.CloseActiveOutage(ctx, now); err != nil {
 			s.log.Error("close outage", "error", err)
+		} else {
+			s.emit(ctx, domain.NotificationEvent{
+				ID:        fmt.Sprintf("outage-close-%d", now.UnixNano()),
+				Severity:  "recovery",
+				Metric:    "outage",
+				Title:     "Connection recovered",
+				Message:   "At least one configured latency target is reachable again.",
+				Timestamp: now,
+			})
 		}
+	}
+}
+
+func (s *Service) emitSpeedTestEvent(ctx context.Context, result domain.SpeedTest) {
+	if result.Success {
+		message := "Speed test completed successfully."
+		if result.DownloadMbps != nil && result.UploadMbps != nil {
+			message = fmt.Sprintf("Speed test completed: %.1f Mbps down, %.1f Mbps up.", *result.DownloadMbps, *result.UploadMbps)
+		}
+		s.emit(ctx, domain.NotificationEvent{
+			ID:        fmt.Sprintf("speedtest-success-%d", result.StartedAt.UnixNano()),
+			Severity:  "info",
+			Metric:    "speedtest",
+			Title:     "Speed test completed",
+			Message:   message,
+			Timestamp: time.Now().UTC(),
+		})
+		return
+	}
+	s.emit(ctx, domain.NotificationEvent{
+		ID:        fmt.Sprintf("speedtest-failed-%d", result.StartedAt.UnixNano()),
+		Severity:  "warning",
+		Metric:    "speedtest",
+		Title:     "Speed test failed",
+		Message:   result.Error,
+		Timestamp: time.Now().UTC(),
+	})
+}
+
+func (s *Service) emit(ctx context.Context, event domain.NotificationEvent) {
+	if s.outbox == nil || !s.outbox.Enabled() {
+		return
+	}
+	if err := s.outbox.Write(ctx, event); err != nil {
+		s.log.Warn("write notification event", "error", err, "metric", event.Metric)
 	}
 }
 
