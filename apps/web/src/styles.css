@@ -1,0 +1,189 @@
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f5f6f8;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-sider {
+  border-right: 1px solid #e7e9ee;
+}
+
+.app-title {
+  margin: 20px 18px 18px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 48px;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #e7e9ee;
+}
+
+.header-user {
+  height: 100%;
+}
+
+.app-content {
+  padding: 24px;
+}
+
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.page-heading h2 {
+  margin: 0;
+}
+
+.page-alert {
+  margin-bottom: 16px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.dashboard-grid {
+  display: block;
+}
+
+.dashboard-grid > * + * {
+  margin-top: 16px;
+}
+
+.network-hero {
+  min-height: 320px;
+}
+
+.hero-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.hero-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.network-path {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(42px, 0.7fr) minmax(90px, 1fr) minmax(42px, 0.7fr) minmax(90px, 1fr);
+  align-items: center;
+  margin: 10px 0 30px;
+}
+
+.network-node {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 92px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.network-node .anticon {
+  color: #1677ff;
+  font-size: 26px;
+}
+
+.network-link {
+  height: 2px;
+  background: #1677ff;
+}
+
+.quality-panel {
+  min-height: 320px;
+}
+
+.quality-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 4px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.quality-meta strong {
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+  text-align: right;
+}
+
+.metric-tile {
+  min-height: 118px;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.target-search {
+  width: min(320px, 48vw);
+}
+
+.center-screen,
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: #f5f6f8;
+}
+
+.login-card {
+  width: min(420px, 100%);
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    padding: 16px;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hero-topline {
+    flex-direction: column;
+  }
+
+  .network-path {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .network-link {
+    width: 2px;
+    height: 24px;
+    justify-self: center;
+    background: #1677ff;
+  }
+}
