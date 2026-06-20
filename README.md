@@ -186,12 +186,214 @@ Default `.env.example` credentials are `admin` / `changeme123`. Change them befo
 
 ## Synology Container Manager
 
-1. Create `/volume1/docker/connection-monitor/data`.
-2. Copy this repository to your NAS or build from a Git source supported by your workflow.
-3. Create a `.env` file next to `docker-compose.yml` with `DATA_DIR=/volume1/docker/connection-monitor/data`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
-4. In Container Manager, create a project using `docker-compose.yml`.
-5. Build and start the service.
-6. Open `http://SYNOLOGY_IP:8810` from your LAN.
+Connection Monitor is designed to run as one container on Synology Container Manager. The Go API serves the React build, so you do not need Web Station, a separate nginx container, or a second frontend service.
+
+### Recommended NAS Layout
+
+Use one parent directory for the app and one persistent directory for SQLite data:
+
+```text
+/volume1/docker/connection-monitor/
+  app/       Repository checkout or uploaded source bundle
+  data/      SQLite database and WAL files
+```
+
+The `data` directory is the only runtime state you must preserve. Do not store the database inside the source checkout because application updates may replace that directory.
+
+### What To Ship
+
+For a source-based install, ship the repository root with:
+
+- `Dockerfile`
+- `docker-compose.yml`
+- `.env.example`
+- `apps/web`
+- `services/api`
+- `README.md`
+
+Do not ship generated or local runtime directories:
+
+- `.git`, unless you intentionally deploy with Git
+- `data`
+- `.cache`
+- `apps/web/node_modules`
+- `apps/web/dist`
+- local `.env` files containing real credentials
+
+Create a clean source archive from your workstation with:
+
+```bash
+tar \
+  --exclude='.git' \
+  --exclude='data' \
+  --exclude='.cache' \
+  --exclude='apps/web/node_modules' \
+  --exclude='apps/web/dist' \
+  -czf connection-monitor-source.tar.gz .
+```
+
+Upload that archive to the NAS and extract it under:
+
+```text
+/volume1/docker/connection-monitor/app
+```
+
+### Environment File
+
+Create `/volume1/docker/connection-monitor/app/.env` before the first start:
+
+```bash
+DATA_DIR=/volume1/docker/connection-monitor/data
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=replace-this-password
+```
+
+`ADMIN_USERNAME` and `ADMIN_PASSWORD` are only used to create the first admin user when the database has no users. After first boot, manage users and passwords from the Users page.
+
+### Install With Container Manager UI
+
+1. Open File Station.
+2. Create `/volume1/docker/connection-monitor/app`.
+3. Create `/volume1/docker/connection-monitor/data`.
+4. Upload or clone the project into `/volume1/docker/connection-monitor/app`.
+5. Create `/volume1/docker/connection-monitor/app/.env` with `DATA_DIR`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
+6. Open Container Manager.
+7. Go to `Project`.
+8. Choose `Create`.
+9. Set the project name to `connection-monitor`.
+10. Set the project path to `/volume1/docker/connection-monitor/app`.
+11. Select the existing `docker-compose.yml`.
+12. Build and start the project.
+13. Open `http://SYNOLOGY_IP:8810` from a LAN device.
+
+The first build compiles the Go service, builds the React app, and installs the official Ookla Speedtest CLI in the final image. The NAS needs internet access during that build.
+
+### Install With SSH
+
+If SSH is enabled on the NAS, the same deployment can be done from a shell:
+
+```bash
+ssh admin@SYNOLOGY_IP
+sudo -i
+mkdir -p /volume1/docker/connection-monitor/app /volume1/docker/connection-monitor/data
+cd /volume1/docker/connection-monitor/app
+git clone https://github.com/OWNER/REPOSITORY.git .
+cp .env.example .env
+vi .env
+docker compose up -d --build
+docker compose logs -f
+```
+
+Some Synology installations provide Compose as `docker-compose` instead of `docker compose`:
+
+```bash
+docker-compose up -d --build
+docker-compose logs -f
+```
+
+### Install From A GitHub Release Image
+
+The CI/CD pipeline publishes release images to GitHub Container Registry after a GitHub Release is created:
+
+```text
+ghcr.io/OWNER/REPOSITORY:v0.2.0
+```
+
+To deploy a prebuilt image instead of building on the NAS, replace the `build: .` line in `docker-compose.yml` with an image reference:
+
+```yaml
+services:
+  connection-monitor:
+    image: ghcr.io/OWNER/REPOSITORY:v0.2.0
+    container_name: connection-monitor
+    ports:
+      - "8810:8080"
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    environment:
+      - TZ=${TZ:-Europe/Madrid}
+      - DB_PATH=/data/connection-monitor.db
+      - APP_ENV=production
+      - STATIC_PATH=/app/apps/web/dist
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+    restart: unless-stopped
+```
+
+Use immutable release tags such as `v0.2.0` for NAS deployments. `latest` is convenient for testing but makes rollbacks less predictable.
+
+### Offline Image Transfer
+
+If the NAS cannot build or pull images, build the image on another machine and transfer it manually.
+
+On your workstation:
+
+```bash
+docker build -t connection-monitor:local .
+docker save connection-monitor:local -o connection-monitor-image.tar
+```
+
+Upload `connection-monitor-image.tar` to the NAS, then load it:
+
+```bash
+ssh admin@SYNOLOGY_IP
+sudo -i
+docker load -i /path/to/connection-monitor-image.tar
+```
+
+Use `image: connection-monitor:local` in `docker-compose.yml` instead of `build: .`.
+
+### Updating On Synology
+
+Back up the database before updating:
+
+```bash
+docker compose stop
+cp /volume1/docker/connection-monitor/data/connection-monitor.db /volume1/docker/connection-monitor/data/connection-monitor.db.bak
+docker compose start
+```
+
+For a source checkout:
+
+```bash
+cd /volume1/docker/connection-monitor/app
+git pull
+docker compose up -d --build
+```
+
+For a release image, update the image tag in `docker-compose.yml`, then recreate the service:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Migrations run automatically at startup. Keep the database backup until you confirm the new version starts cleanly.
+
+### Permissions
+
+The container runs the app as a non-root user. The mounted data directory must be writable by the container.
+
+If startup logs show `unable to open database file`, check that this directory exists:
+
+```text
+/volume1/docker/connection-monitor/data
+```
+
+Then fix write access from File Station permissions or SSH:
+
+```bash
+chmod 775 /volume1/docker/connection-monitor/data
+```
+
+### LAN-Only Synology Checklist
+
+- Do not configure router port forwarding for port `8810`.
+- Do not publish the app through QuickConnect.
+- Do not add it to Synology Web Station.
+- Allow port `8810` only from your LAN in Synology Firewall.
+- For stricter binding, map the port to the NAS LAN IP only, for example `"192.168.1.10:8810:8080"`.
+- Use a VPN such as Tailscale, WireGuard, or Synology VPN Server for remote access.
 
 No Web Station, reverse proxy, QuickConnect, or public port forwarding is required.
 
