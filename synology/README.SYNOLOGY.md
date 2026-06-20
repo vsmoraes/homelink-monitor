@@ -2,17 +2,18 @@
 
 This directory contains the source files used to build a Docker-backed Synology DSM package for HomeLink Monitor.
 
-The SPK does not install the Go binary directly into DSM. It installs a package payload containing a Synology-specific Docker Compose file, a clean copy of the existing application source used as the Docker build context, lifecycle scripts, and a notification helper. Runtime execution stays inside Docker / Container Manager.
+The SPK does not install the Go binary directly into DSM. It installs a package payload containing a Synology-specific Docker Compose project, locally built API/UI artifacts, lifecycle scripts, and a notification helper. Runtime execution stays inside Docker / Container Manager.
 
 ## Requirements
 
 - Synology DSM 7.x.
 - Synology Container Manager / Docker installed and running.
-- Docker Compose support through either `docker compose` or `docker-compose`.
 - LAN access to the NAS on the configured HTTP port.
-- Internet access during first start if the image must be built on the NAS.
+- Docker on the build machine when creating the SPK.
+- Internet access on the build machine for Node/Go dependency downloads.
+- Internet access on the NAS during first start if the runtime image needs to install the Ookla Speedtest CLI.
 
-The exact DSM package dependency key for Container Manager can vary by DSM and package generation. The SPK therefore does not rely only on INFO metadata for dependency enforcement. The lifecycle scripts check for Docker and Compose at install/start time and fail with a clear message if unavailable.
+The exact DSM package dependency key for Container Manager can vary by DSM and package generation. The SPK uses Synology's `docker-project` resource worker and still keeps runtime checks conservative.
 
 ## Build The SPK
 
@@ -29,6 +30,32 @@ dist/homelink-monitor-<version>.spk
 ```
 
 The build creates temporary package layout files under `build/`. Those files are generated artifacts and should not be committed.
+
+`make spk` uses Docker builder containers on the local machine:
+
+- `node:26-alpine` builds the React UI into a mounted output directory.
+- `golang:1.26-alpine` builds the Go API binary into a mounted output directory.
+
+Those artifacts are bundled into:
+
+```text
+project/app/connection-monitor
+project/app/web
+```
+
+DSM does not compile the Go API or React UI. Container Manager only builds a small runtime image that copies those bundled artifacts into `/app`.
+
+The Go binary must match the NAS CPU architecture. The default is `amd64`, which fits most Intel/AMD Synology NAS devices:
+
+```bash
+make spk
+```
+
+For ARM64 Synology models:
+
+```bash
+make spk SPK_GOARCH=arm64
+```
 
 ## Manual Install
 
@@ -134,13 +161,20 @@ The SPK payload includes a Synology-specific Compose file generated from:
 synology/templates/docker-compose.yml
 ```
 
-It builds the existing application image from the source snapshot embedded in the SPK payload:
+The package includes locally built app artifacts:
 
 ```text
-/var/packages/homelink-monitor/target/source
+/var/packages/homelink-monitor/target/project/app/connection-monitor
+/var/packages/homelink-monitor/target/project/app/web
 ```
 
-This intentionally reuses the repository's existing root Dockerfile and build context instead of inventing a separate app stack.
+Synology Container Manager builds a runtime image from:
+
+```text
+/var/packages/homelink-monitor/target/project/Dockerfile
+```
+
+That runtime image copies the bundled app artifacts into the container image and then starts the Compose project from `project/compose.yml`.
 
 The container mounts:
 

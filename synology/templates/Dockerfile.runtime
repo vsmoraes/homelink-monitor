@@ -1,0 +1,32 @@
+FROM debian:bookworm-slim
+
+ARG INSTALL_SPEEDTEST=true
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && if [ "$INSTALL_SPEEDTEST" = "true" ]; then \
+      curl -fsSL https://packagecloud.io/ookla/speedtest-cli/gpgkey | gpg --dearmor -o /usr/share/keyrings/ookla-speedtest-archive-keyring.gpg \
+      && echo "deb [signed-by=/usr/share/keyrings/ookla-speedtest-archive-keyring.gpg] https://packagecloud.io/ookla/speedtest-cli/debian/ bookworm main" > /etc/apt/sources.list.d/ookla-speedtest.list \
+      && apt-get update \
+      && apt-get install -y --no-install-recommends speedtest; \
+    fi \
+    && apt-get purge -y --auto-remove curl gnupg \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --home-dir /nonexistent --shell /usr/sbin/nologin appuser \
+    && mkdir -p /data /app/apps/web/dist \
+    && chown -R appuser:appuser /data /app
+
+COPY app/connection-monitor /app/connection-monitor
+COPY app/web/ /app/apps/web/dist/
+
+RUN chown -R appuser:appuser /app \
+    && chmod 0755 /app/connection-monitor
+
+USER appuser
+WORKDIR /app
+ENV ADDR=:8080
+ENV DB_PATH=/data/homelink-monitor.db
+ENV STATIC_PATH=/app/apps/web/dist
+EXPOSE 8080
+CMD ["/app/connection-monitor"]

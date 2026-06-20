@@ -34,6 +34,22 @@ value_from_wizard() {
   return 1
 }
 
+first_value() {
+  for key in "$@"; do
+    if value="$(value_from_wizard "$key")"; then
+      printf '%s' "$value"
+      return 0
+    fi
+  done
+  return 1
+}
+
+log_info() {
+  if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+    printf '%s\n' "$1" >> "$SYNOPKG_TEMP_LOGFILE"
+  fi
+}
+
 sed_escape() {
   printf '%s' "$1" | sed 's/[\/&]/\\&/g'
 }
@@ -45,23 +61,17 @@ validate_port() {
   [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]
 }
 
-ADMIN_USERNAME="$(value_from_wizard wizard_admin_username || printf '%s' "${ADMIN_USERNAME:-admin}")"
-ADMIN_PASSWORD="$(value_from_wizard wizard_admin_password || printf '%s' "${ADMIN_PASSWORD:-}")"
-ADMIN_PASSWORD_CONFIRM="$(value_from_wizard wizard_admin_password_confirm || printf '%s' "${ADMIN_PASSWORD_CONFIRM:-$ADMIN_PASSWORD}")"
-HTTP_PORT="$(value_from_wizard wizard_http_port || printf '%s' "${HTTP_PORT:-8810}")"
-DSM_NOTIFICATIONS_ENABLED="$(value_from_wizard wizard_dsm_notifications_enabled || printf '%s' "${DSM_NOTIFICATIONS_ENABLED:-true}")"
+ADMIN_USERNAME="$(first_value ADMIN_USERNAME wizard_admin_username || printf '%s' "admin")"
+ADMIN_PASSWORD="$(first_value ADMIN_PASSWORD wizard_admin_password || printf '%s' "")"
+ADMIN_PASSWORD_CONFIRM="$(first_value ADMIN_PASSWORD_CONFIRM wizard_admin_password_confirm || printf '%s' "")"
+HTTP_PORT="$(first_value HTTP_PORT wizard_http_port || printf '%s' "8810")"
+DSM_NOTIFICATIONS_ENABLED="$(first_value DSM_NOTIFICATIONS_ENABLED wizard_dsm_notifications_enabled || printf '%s' "true")"
 
-if [ -z "$ADMIN_PASSWORD" ]; then
-  if command -v openssl >/dev/null 2>&1; then
-    ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
-  else
-    ADMIN_PASSWORD="$(date +%s | sha256sum | awk '{print $1}')"
-  fi
-  ADMIN_PASSWORD_CONFIRM="$ADMIN_PASSWORD"
-fi
+log_info "HomeLink Monitor wizard values captured: admin_username_len=${#ADMIN_USERNAME}, admin_password_len=${#ADMIN_PASSWORD}, http_port=$HTTP_PORT, dsm_notifications=$DSM_NOTIFICATIONS_ENABLED"
 
 [ -n "$ADMIN_USERNAME" ] || fail "Admin username cannot be empty."
 [ -n "$ADMIN_PASSWORD" ] || fail "Admin password cannot be empty."
+[ "${#ADMIN_PASSWORD}" -ge 8 ] || fail "Admin password must be at least 8 characters."
 [ "$ADMIN_PASSWORD" = "$ADMIN_PASSWORD_CONFIRM" ] || fail "Admin password confirmation does not match."
 validate_port "$HTTP_PORT" || fail "HTTP port must be numeric and between 1024 and 65535."
 case "$DSM_NOTIFICATIONS_ENABLED" in

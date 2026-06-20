@@ -7,7 +7,7 @@
         "desc": "Admin username",
         "subitems": [
           {
-            "key": "wizard_admin_username",
+            "key": "ADMIN_USERNAME",
             "desc": "Username",
             "defaultValue": "admin",
             "validator": {
@@ -21,7 +21,7 @@
         "desc": "Admin password",
         "subitems": [
           {
-            "key": "wizard_admin_password",
+            "key": "ADMIN_PASSWORD",
             "desc": "Password",
             "validator": {
               "allowBlank": false
@@ -34,11 +34,11 @@
         "desc": "Confirm admin password",
         "subitems": [
           {
-            "key": "wizard_admin_password_confirm",
+            "key": "ADMIN_PASSWORD_CONFIRM",
             "desc": "Confirm password",
             "validator": {
               "allowBlank": false,
-              "equalTo": "wizard_admin_password"
+              "equalTo": "ADMIN_PASSWORD"
             }
           }
         ]
@@ -48,7 +48,7 @@
         "desc": "HTTP port",
         "subitems": [
           {
-            "key": "wizard_http_port",
+            "key": "HTTP_PORT",
             "desc": "Port",
             "defaultValue": "8810",
             "validator": {
@@ -65,7 +65,7 @@
         "desc": "DSM notifications",
         "subitems": [
           {
-            "key": "wizard_dsm_notifications_enabled",
+            "key": "DSM_NOTIFICATIONS_ENABLED",
             "desc": "Enable DSM notifications",
             "defaultValue": "true",
             "values": [

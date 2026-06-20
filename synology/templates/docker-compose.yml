@@ -1,7 +1,7 @@
 services:
   homelink-monitor:
     build:
-      context: ./source
+      context: .
       dockerfile: Dockerfile
     image: homelink-monitor:spk
     container_name: homelink-monitor
