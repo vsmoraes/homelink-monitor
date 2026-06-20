@@ -1,0 +1,9 @@
+.git
+data
+services/api/connection-monitor.db
+apps/web/node_modules
+apps/web/dist
+**/.DS_Store
+.cache
+services/api/.cache
+apps/web/.cache
