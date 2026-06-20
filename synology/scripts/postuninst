@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+PKG_NAME="homelink-monitor"
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG_NAME/var}"
+
+rm -f "$PKG_VAR/notification-helper.pid"
+
+cat <<EOF
+HomeLink Monitor package helper files were cleaned up.
+Persistent data is intentionally left under:
+$PKG_VAR
+Remove it manually only if you want to delete the SQLite database and configuration.
+EOF
+
+exit 0

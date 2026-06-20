@@ -1,0 +1,16 @@
+services:
+  homelink-monitor:
+    build:
+      context: ./source
+      dockerfile: Dockerfile
+    image: homelink-monitor:spk
+    container_name: homelink-monitor
+    ports:
+      - "${HTTP_PORT:-8810}:8080"
+    env_file:
+      - /var/packages/homelink-monitor/var/config/app.env
+    volumes:
+      - /var/packages/homelink-monitor/var/data:/data
+      - /var/packages/homelink-monitor/var/config:/config:ro
+      - /var/packages/homelink-monitor/var/events/outbox:/events/outbox
+    restart: unless-stopped

@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+PKG_NAME="homelink-monitor"
+PKG_DEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG_NAME/target}"
+
+if [ -x "$PKG_DEST/scripts/start-stop-status" ]; then
+  "$PKG_DEST/scripts/start-stop-status" stop || true
+elif [ -x "/var/packages/$PKG_NAME/scripts/start-stop-status" ]; then
+  "/var/packages/$PKG_NAME/scripts/start-stop-status" stop || true
+fi
+
+exit 0

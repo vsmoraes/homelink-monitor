@@ -1,0 +1,104 @@
+#!/bin/sh
+set -eu
+
+PKG_NAME="homelink-monitor"
+CONTAINER_NAME="homelink-monitor"
+PKG_DEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG_NAME/target}"
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG_NAME/var}"
+APP_ENV="$PKG_VAR/config/app.env"
+LOG_DIR="$PKG_VAR/logs"
+HELPER="$PKG_DEST/notification-helper.sh"
+HELPER_PID="$PKG_VAR/notification-helper.pid"
+
+fail() {
+  echo "$1" >&2
+  exit 1
+}
+
+compose_cmd() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    echo "docker compose"
+    return 0
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    echo "docker-compose"
+    return 0
+  fi
+  return 1
+}
+
+require_docker() {
+  command -v docker >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
+  docker info >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
+}
+
+is_running() {
+  [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)" = "true" ]
+}
+
+start_helper() {
+  [ -f "$APP_ENV" ] || return 0
+  # shellcheck disable=SC1090
+  . "$APP_ENV"
+  case "${DSM_NOTIFICATIONS_ENABLED:-true}" in
+    true|1|yes|on) ;;
+    *) return 0 ;;
+  esac
+  [ -x "$HELPER" ] || return 0
+  if [ -f "$HELPER_PID" ] && kill -0 "$(cat "$HELPER_PID")" 2>/dev/null; then
+    return 0
+  fi
+  mkdir -p "$LOG_DIR"
+  "$HELPER" >/dev/null 2>&1 &
+  echo "$!" > "$HELPER_PID"
+}
+
+stop_helper() {
+  if [ -f "$HELPER_PID" ]; then
+    pid="$(cat "$HELPER_PID" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null || true
+    fi
+    rm -f "$HELPER_PID"
+  fi
+}
+
+case "${1:-}" in
+  start)
+    require_docker
+    [ -f "$APP_ENV" ] || fail "Missing configuration file: $APP_ENV"
+    COMPOSE="$(compose_cmd)" || fail "Docker Compose was not found. Install or enable Synology Container Manager / Docker Compose support."
+    mkdir -p "$LOG_DIR"
+    cd "$PKG_DEST"
+    $COMPOSE --env-file "$APP_ENV" up -d
+    start_helper
+    ;;
+  stop)
+    stop_helper
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+      if COMPOSE="$(compose_cmd 2>/dev/null)"; then
+        cd "$PKG_DEST"
+        $COMPOSE --env-file "$APP_ENV" down --remove-orphans || true
+      fi
+    fi
+    ;;
+  status)
+    require_docker
+    if is_running; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  log)
+    echo "$LOG_DIR/notification-helper.log"
+    if command -v docker >/dev/null 2>&1; then
+      docker logs --tail 100 "$CONTAINER_NAME" 2>/dev/null || true
+    fi
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|log}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

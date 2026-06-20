@@ -1,0 +1,97 @@
+#!/bin/sh
+set -eu
+
+PKG_NAME="homelink-monitor"
+PKG_DEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG_NAME/target}"
+PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG_NAME/var}"
+CONFIG_DIR="$PKG_VAR/config"
+APP_ENV="$CONFIG_DIR/app.env"
+TEMPLATE="$PKG_DEST/.env.template"
+
+fail() {
+  echo "$1" >&2
+  exit 1
+}
+
+compose_cmd() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    echo "docker compose"
+    return 0
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    echo "docker-compose"
+    return 0
+  fi
+  return 1
+}
+
+require_docker() {
+  command -v docker >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
+  docker info >/dev/null 2>&1 || fail "HomeLink Monitor requires Synology Container Manager / Docker to be installed and running."
+  compose_cmd >/dev/null 2>&1 || fail "Docker Compose was not found. Install or enable Synology Container Manager / Docker Compose support."
+}
+
+value_from_wizard() {
+  key="$1"
+  upper_key="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')"
+  eval "value=\${$key:-}"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+    return 0
+  fi
+  eval "value=\${$upper_key:-}"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+    return 0
+  fi
+  eval "value=\${SYNOPKG_$upper_key:-}"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+    return 0
+  fi
+  return 1
+}
+
+sed_escape() {
+  printf '%s' "$1" | sed 's/[\/&]/\\&/g'
+}
+
+validate_port() {
+  case "$1" in
+    *[!0-9]*|"") return 1 ;;
+  esac
+  [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]
+}
+
+ADMIN_USERNAME="$(value_from_wizard wizard_admin_username || printf '%s' "${ADMIN_USERNAME:-admin}")"
+ADMIN_PASSWORD="$(value_from_wizard wizard_admin_password || printf '%s' "${ADMIN_PASSWORD:-}")"
+ADMIN_PASSWORD_CONFIRM="$(value_from_wizard wizard_admin_password_confirm || printf '%s' "${ADMIN_PASSWORD_CONFIRM:-$ADMIN_PASSWORD}")"
+HTTP_PORT="$(value_from_wizard wizard_http_port || printf '%s' "${HTTP_PORT:-8810}")"
+DSM_NOTIFICATIONS_ENABLED="$(value_from_wizard wizard_dsm_notifications_enabled || printf '%s' "${DSM_NOTIFICATIONS_ENABLED:-true}")"
+
+[ -n "$ADMIN_USERNAME" ] || fail "Admin username cannot be empty."
+[ -n "$ADMIN_PASSWORD" ] || fail "Admin password cannot be empty."
+[ "$ADMIN_PASSWORD" = "$ADMIN_PASSWORD_CONFIRM" ] || fail "Admin password confirmation does not match."
+validate_port "$HTTP_PORT" || fail "HTTP port must be numeric and between 1024 and 65535."
+case "$DSM_NOTIFICATIONS_ENABLED" in
+  true|false|1|0|yes|no|on|off) ;;
+  *) fail "DSM notifications value must be true or false." ;;
+esac
+
+[ -f "$TEMPLATE" ] || fail "Missing app env template: $TEMPLATE"
+require_docker
+
+mkdir -p "$PKG_VAR/data" "$CONFIG_DIR" "$PKG_VAR/events/outbox" "$PKG_VAR/events/processed" "$PKG_VAR/events/failed" "$PKG_VAR/logs"
+
+umask 077
+sed \
+  -e "s/__ADMIN_USERNAME__/$(sed_escape "$ADMIN_USERNAME")/g" \
+  -e "s/__ADMIN_PASSWORD__/$(sed_escape "$ADMIN_PASSWORD")/g" \
+  -e "s/__HTTP_PORT__/$(sed_escape "$HTTP_PORT")/g" \
+  -e "s/__DSM_NOTIFICATIONS_ENABLED__/$(sed_escape "$DSM_NOTIFICATIONS_ENABLED")/g" \
+  "$TEMPLATE" > "$APP_ENV"
+chmod 600 "$APP_ENV"
+
+echo "HomeLink Monitor configuration written to $APP_ENV."
+echo "The package can now be started from DSM Package Center."
+exit 0

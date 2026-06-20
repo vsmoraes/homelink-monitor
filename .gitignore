@@ -1,4 +1,9 @@
 .cache/
+.env
+app.env
+*.spk
+build/
+dist/
 
 # Go
 services/api/server
