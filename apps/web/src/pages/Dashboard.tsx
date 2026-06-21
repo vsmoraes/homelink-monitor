@@ -8,6 +8,10 @@ import type { DNSCheck, LatencyCheck, SpeedTest, Summary } from '../types';
 import { localTime, mbps, ms, number } from '../utils/format';
 import { statusColor, statusText } from '../utils/status';
 
+const latencyColors = ['#18c98f', '#13b8c8', '#7be84d', '#f5a524', '#597ef7', '#eb2f96'];
+const dnsColors = ['#13b8c8', '#18c98f', '#7be84d', '#f5a524', '#597ef7', '#eb2f96'];
+const seriesKey = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_');
+
 export default function Dashboard() {
   const [summary, setSummary] = useState<Summary>();
   const [speedTests, setSpeedTests] = useState<SpeedTest[]>([]);
@@ -68,14 +72,16 @@ export default function Dashboard() {
     .reverse()
     .filter((item) => item.success)
     .map((item) => ({ time: localTime(item.startedAt), download: item.downloadMbps, upload: item.uploadMbps }));
+  const latencyTargets = Array.from(new Set(latencyChecks.map((item) => item.target)));
   const latencyChart = [...latencyChecks]
     .reverse()
     .filter((item) => item.success)
-    .map((item) => ({ time: localTime(item.checkedAt), latency: item.latencyMs, target: item.target }));
+    .map((item) => ({ time: localTime(item.checkedAt), [seriesKey(item.target)]: item.latencyMs }));
+  const dnsDomains = Array.from(new Set(dnsChecks.map((item) => item.domain)));
   const dnsChart = [...dnsChecks]
     .reverse()
     .filter((item) => item.success)
-    .map((item) => ({ time: localTime(item.checkedAt), duration: item.durationMs, domain: item.domain }));
+    .map((item) => ({ time: localTime(item.checkedAt), [seriesKey(item.domain)]: item.durationMs }));
   const failureCount = latencyChecks.filter((item) => !item.success).length
     + dnsChecks.filter((item) => !item.success).length
     + speedTests.filter((item) => !item.success).length;
@@ -180,7 +186,9 @@ export default function Dashboard() {
                     <XAxis dataKey="time" hide />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="latency" stroke="#18c98f" dot={false} name="Latency" />
+                    {latencyTargets.map((target, index) => (
+                      <Line key={target} type="monotone" dataKey={seriesKey(target)} stroke={latencyColors[index % latencyColors.length]} dot={false} name={target} connectNulls />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
                     </div>
@@ -196,7 +204,9 @@ export default function Dashboard() {
                     <XAxis dataKey="time" hide />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="duration" stroke="#13c2c2" dot={false} name="Duration" />
+                    {dnsDomains.map((domain, index) => (
+                      <Line key={domain} type="monotone" dataKey={seriesKey(domain)} stroke={dnsColors[index % dnsColors.length]} dot={false} name={domain} connectNulls />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
                     </div>

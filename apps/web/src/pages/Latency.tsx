@@ -7,6 +7,9 @@ import ResultTag from '../components/ResultTag';
 import type { LatencyCheck, LatencySummary } from '../types';
 import { localTime, ms, number } from '../utils/format';
 
+const colors = ['#18c98f', '#13b8c8', '#7be84d', '#f5a524', '#597ef7', '#eb2f96'];
+const seriesKey = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_');
+
 export default function Latency() {
   const [target, setTarget] = useState('');
   const [items, setItems] = useState<LatencyCheck[]>([]);
@@ -29,13 +32,24 @@ export default function Latency() {
     };
     void load();
   }, [target]);
-  const chart = [...items].reverse().filter((item) => item.success).map((item) => ({ time: localTime(item.checkedAt), latency: item.latencyMs }));
+  const targets = Array.from(new Set(items.map((item) => item.target)));
+  const chart = [...items].reverse().filter((item) => item.success).map((item) => ({
+    time: localTime(item.checkedAt),
+    [seriesKey(item.target)]: item.latencyMs,
+  }));
   return (
     <Page title="Latency" loading={loading} error={error} actions={<Input.Search placeholder="Filter target" allowClear onSearch={setTarget} className="target-search" />}>
       <Space direction="vertical" size="large" className="full-width">
         <Card title={`Min ${ms(summary?.minMs)}   Avg ${ms(summary?.avgMs)}   Max ${ms(summary?.maxMs)}   Loss ${number(summary?.packetLoss)}%`}>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chart}><XAxis dataKey="time" hide /><YAxis /><Tooltip /><Line type="monotone" dataKey="latency" stroke="#1677ff" dot={false} /></LineChart>
+            <LineChart data={chart}>
+              <XAxis dataKey="time" hide />
+              <YAxis />
+              <Tooltip />
+              {targets.map((target, index) => (
+                <Line key={target} type="monotone" dataKey={seriesKey(target)} name={target} stroke={colors[index % colors.length]} dot={false} connectNulls />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </Card>
         <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[

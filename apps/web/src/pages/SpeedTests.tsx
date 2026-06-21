@@ -97,14 +97,20 @@ export default function SpeedTests() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
-        <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[
-          { title: 'Started', dataIndex: 'startedAt', render: localTime },
-          { title: 'Download', render: (_, r) => mbps(r.downloadMbps) },
-          { title: 'Upload', render: (_, r) => mbps(r.uploadMbps) },
-          { title: 'Ping', render: (_, r) => ms(r.pingMs) },
-          { title: 'Result', render: (_, r) => <ResultTag success={r.success} /> },
-          { title: 'Error', dataIndex: 'error' },
-        ]} />
+        <Table
+          rowKey="id"
+          dataSource={items}
+          scroll={{ x: 'max-content' }}
+          pagination={{ showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100] }}
+          columns={[
+            { title: 'Started', dataIndex: 'startedAt', render: localTime },
+            { title: 'Download', render: (_, r) => mbps(r.downloadMbps) },
+            { title: 'Upload', render: (_, r) => mbps(r.uploadMbps) },
+            { title: 'Ping', render: (_, r) => ms(r.pingMs) },
+            { title: 'Result', render: (_, r) => <ResultTag success={r.success} /> },
+            { title: 'Error', dataIndex: 'error' },
+          ]}
+        />
       </Space>
     </Page>
   );
