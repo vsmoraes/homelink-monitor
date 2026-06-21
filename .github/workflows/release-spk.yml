@@ -1,0 +1,112 @@
+name: Release SPK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version. Use the same value you want in the SPK, for example 0.1.0-0010.
+        required: true
+      prerelease:
+        description: Mark the GitHub Release as a prerelease.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-spk-${{ github.ref_name || inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build and publish SPK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            raw="${{ inputs.version }}"
+            version="${raw#v}"
+            tag="v${version}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#v}"
+          fi
+
+          case "$version" in
+            ""|*[!0-9A-Za-z._-]*)
+              echo "Invalid version: $version" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "spk=dist/homelink-monitor-${version}.spk" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build SPK
+        run: make spk VERSION="${{ steps.version.outputs.version }}"
+
+      - name: Verify SPK contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          spk="${{ steps.version.outputs.spk }}"
+          test -f "$spk"
+          tar -tf "$spk" | tee /tmp/spk-files.txt
+          grep -qx "INFO" /tmp/spk-files.txt
+          grep -qx "PACKAGE_ICON.PNG" /tmp/spk-files.txt
+          grep -qx "PACKAGE_ICON_256.PNG" /tmp/spk-files.txt
+          grep -qx "package.tgz" /tmp/spk-files.txt
+          grep -qx "scripts/start-stop-status" /tmp/spk-files.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homelink-monitor-spk-${{ steps.version.outputs.version }}
+          path: ${{ steps.version.outputs.spk }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          version="${{ steps.version.outputs.version }}"
+          spk="${{ steps.version.outputs.spk }}"
+          prerelease_flag=""
+          target_flag=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.prerelease }}" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            target_flag="--target ${GITHUB_SHA}"
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$spk" --clobber
+          else
+            gh release create "$tag" "$spk" \
+              --title "HomeLink Monitor ${version}" \
+              --notes "Docker-backed Synology SPK for HomeLink Monitor ${version}." \
+              $target_flag \
+              $prerelease_flag
+          fi

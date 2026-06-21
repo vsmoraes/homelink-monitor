@@ -1,61 +1,50 @@
 # HomeLink Monitor
 
-HomeLink Monitor is a self-hosted dashboard for monitoring your home internet connection from a NAS or any Docker host on your LAN.
+<p align="center">
+  <img src="img/logo.png" alt="HomeLink Monitor logo" width="140" />
+</p>
 
-It tracks latency, DNS health, speed tests, outages, and connection status over time. The app is local-first, stores data in SQLite, and is designed to run well on Synology Container Manager.
+<p align="center">
+  <a href="https://github.com/vsmoraes/homelink-monitor/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/vsmoraes/homelink-monitor/ci.yml?branch=main&label=ci&style=flat-square"></a>
+  <a href="https://github.com/vsmoraes/homelink-monitor/actions/workflows/release-spk.yml"><img alt="SPK release" src="https://img.shields.io/github/actions/workflow/status/vsmoraes/homelink-monitor/release-spk.yml?label=spk&style=flat-square"></a>
+  <a href="https://github.com/vsmoraes/homelink-monitor/pkgs/container/homelink-monitor"><img alt="GHCR" src="https://img.shields.io/badge/ghcr-container-0f172a?style=flat-square&logo=github"></a>
+  <a href="https://github.com/vsmoraes/homelink-monitor/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/vsmoraes/homelink-monitor?style=flat-square"></a>
+  <img alt="Go" src="https://img.shields.io/badge/go-1.25-00ADD8?style=flat-square&logo=go&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react&logoColor=111">
+  <img alt="TypeScript" src="https://img.shields.io/badge/typescript-6-3178C6?style=flat-square&logo=typescript&logoColor=white">
+  <img alt="SQLite" src="https://img.shields.io/badge/sqlite-local--first-003B57?style=flat-square&logo=sqlite&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
+  <img alt="Synology" src="https://img.shields.io/badge/synology-spk-B5B5B6?style=flat-square">
+</p>
+
+Self-hosted LAN dashboard for monitoring home internet health from a NAS or any Docker host.
+
+It tracks latency, DNS health, speed tests, outages, and connection status over time. Data stays local in SQLite.
 
 ## Features
 
-- Connection status dashboard.
-- Latency checks against configurable targets.
-- DNS resolution checks against configurable domains.
-- Manual and scheduled speed tests through the Ookla `speedtest` CLI.
+- Synology-like connection dashboard.
+- Latency checks per target.
+- DNS checks per domain.
+- Manual and scheduled Ookla speed tests.
 - Outage detection.
 - Local users and login.
 - SQLite persistence.
 - Docker Compose deployment.
-- Docker-backed Synology SPK packaging.
+- Docker-backed Synology DSM 7 SPK.
 
-## What It Is Not
+## Not This
 
-- It is not a public monitoring service.
-- It does not configure router port forwarding, QuickConnect, or reverse proxies.
-- It does not require Synology Web Station.
-- It is not a replacement for Prometheus or full observability stacks.
+- Not a public monitoring service.
+- Not a router, QuickConnect, or reverse proxy configurator.
+- Not a Prometheus replacement.
+- Not intended to be exposed directly to the internet.
 
-## Repository Layout
-
-```text
-apps/web/       React, TypeScript, Vite, Ant Design
-services/api/   Go API, SQLite, monitoring jobs
-synology/       DSM SPK packaging files
-Dockerfile      Production image
-docker-compose.yml
-Makefile
-```
-
-Future clients can be added under `apps/`, for example `apps/ios` or `apps/android`.
-
-## Quick Start With Docker Compose
-
-Create a local env file:
+## Quick Start
 
 ```bash
 cp .env.example .env
-```
-
-Edit `.env` and change the default admin password.
-
-Start the app:
-
-```bash
 make run
-```
-
-Equivalent command:
-
-```bash
-docker compose -f docker-compose.yml up -d --build
 ```
 
 Open:
@@ -64,53 +53,35 @@ Open:
 http://localhost:8810
 ```
 
-The default local database is stored in `./data`.
+Change the default admin password in `.env` before using it beyond local testing.
 
-## Synology Container Manager
+## Synology
 
-For a normal Compose deployment on Synology, set `DATA_DIR` to a persistent NAS directory:
+### Docker Compose
 
 ```bash
 DATA_DIR=/volume1/docker/homelink-monitor/data docker compose up -d --build
 ```
 
-Then open:
+Open:
 
 ```text
 http://SYNOLOGY_IP:8810
 ```
 
-Keep the app LAN-only:
+### Package Center SPK
 
-- Do not add router port forwarding.
-- Do not expose it through QuickConnect.
-- Limit the port to LAN clients in DSM Firewall.
-- Use a VPN for remote access.
-
-## Synology Package Center SPK
-
-Build the Docker-backed SPK:
-
-```bash
-make spk
-```
-
-Install it through:
+Download the latest `.spk` from [GitHub Releases](https://github.com/vsmoraes/homelink-monitor/releases), then install it:
 
 ```text
-DSM Package Center -> Manual Install -> dist/homelink-monitor-<version>.spk
+DSM Package Center -> Manual Install -> homelink-monitor-<version>.spk
 ```
 
-The install wizard asks for:
+The wizard asks for admin username, admin password, HTTP port, and DSM notification preference.
 
-- Admin username.
-- Admin password and confirmation.
-- HTTP port, default `8810`.
-- DSM notifications, enabled by default.
+Detailed DSM notes: [synology/README.SYNOLOGY.md](synology/README.SYNOLOGY.md).
 
-Detailed SPK documentation is in [synology/README.SYNOLOGY.md](synology/README.SYNOLOGY.md).
-
-## Local Development
+## Development
 
 Backend:
 
@@ -128,104 +99,72 @@ npm install
 npm run dev
 ```
 
-Open:
-
-```text
-http://localhost:5173
-```
-
-The Vite dev server proxies API requests to `http://localhost:8080`.
-
-## Tests
-
-Backend:
+Tests:
 
 ```bash
-cd services/api
-go test ./...
+cd services/api && go test ./...
+cd apps/web && npm test && npm run build
 ```
 
-Frontend:
+## Build The SPK
 
 ```bash
-cd apps/web
-npm test
-npm run build
+make spk
 ```
 
-SPK packaging validation:
+With an explicit version:
 
 ```bash
-make spk-validate
+make spk VERSION=0.1.0-0010
 ```
 
-## Speed Tests
-
-The default command is:
+Output:
 
 ```text
-speedtest --accept-license --accept-gdpr --format=json
+dist/homelink-monitor-<version>.spk
 ```
 
-The Docker image installs the official Ookla CLI by default. If the command fails or is missing, the app stores the failure and shows the error in the UI.
+## Releases
 
-To build without bundling the Ookla CLI:
+SPKs are built and published automatically by GitHub Actions.
+
+Create a version tag:
 
 ```bash
-docker build --build-arg INSTALL_SPEEDTEST=false -t homelink-monitor .
+git tag v0.1.0-0010
+git push origin v0.1.0-0010
 ```
 
-## Configuration
+The release workflow:
 
-Important environment variables:
+- builds the SPK with `make spk VERSION=0.1.0-0010`
+- verifies the archive structure and package icons
+- creates or updates the GitHub Release
+- uploads `dist/homelink-monitor-0.1.0-0010.spk`
 
-```text
-ADMIN_USERNAME
-ADMIN_PASSWORD
-DB_PATH
-APP_ENV
-STATIC_PATH
-EVENT_OUTBOX_DIR
-DSM_NOTIFICATIONS_ENABLED
-```
+Container images are published to GitHub Container Registry when a GitHub Release is published.
 
-`ADMIN_USERNAME` and `ADMIN_PASSWORD` are only used to create the first admin user when the database has no users. After that, manage users in the UI.
+## Data And Backups
 
-## Backups
-
-Back up the SQLite database from the data directory.
-
-For Docker Compose on Synology:
+SQLite database locations:
 
 ```text
-/volume1/docker/homelink-monitor/data/homelink-monitor.db
-```
-
-For the SPK:
-
-```text
-/var/packages/homelink-monitor/var/data/homelink-monitor.db
+Docker Compose: ./data or $DATA_DIR
+Synology SPK:   /var/packages/homelink-monitor/var/data/homelink-monitor.db
 ```
 
 Stop the container before copying the database, or use SQLite online backup tooling.
 
-## CI/CD
+## LAN-Only Notes
 
-GitHub Actions validate pull requests and pushes to `main`:
-
-- Go formatting, vet, and tests.
-- Web tests and production build.
-- Docker Compose validation and image build.
-
-Dependabot PRs are configured to auto-merge after the validation workflow passes.
-
-Container images are published to GitHub Container Registry when a GitHub Release is published.
-
-Release PR automation is intentionally not enabled because GitHub repository settings may block `GITHUB_TOKEN` from creating pull requests. Create GitHub releases manually, or enable “Allow GitHub Actions to create and approve pull requests” before adding Release Please back.
+- Do not add router port forwarding.
+- Do not expose it through QuickConnect.
+- Limit access with DSM Firewall.
+- Use a VPN for remote access.
 
 ## Troubleshooting
 
-Docker Compose not found:
+Docker Compose missing:
 
 ```text
 Install Docker Compose or Synology Container Manager.
@@ -240,11 +179,5 @@ Check Settings -> speed test command and verify the CLI exists inside the contai
 Cannot open the UI:
 
 ```text
-Confirm host port 8810 maps to container port 8080 and DSM Firewall allows LAN access.
-```
-
-Database errors:
-
-```text
-Confirm the mounted data directory exists and is writable.
+Confirm host port 8810 maps to container port 8080 and your firewall allows LAN access.
 ```

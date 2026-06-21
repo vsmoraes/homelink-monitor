@@ -1,7 +1,8 @@
 SHELL := /bin/sh
 
 PKG_NAME := homelink-monitor
-PKG_VERSION := $(shell sed -n 's/^version="\([^"]*\)"/\1/p' synology/INFO)
+INFO_VERSION := $(shell sed -n 's/^version="\([^"]*\)"/\1/p' synology/INFO)
+PKG_VERSION := $(if $(VERSION),$(patsubst v%,%,$(VERSION)),$(INFO_VERSION))
 SPK_GOOS ?= linux
 SPK_GOARCH ?= amd64
 SPK_GO_LDFLAGS ?= -s -w
@@ -36,6 +37,8 @@ spk-structure:
 	mkdir -p $(SPK_ROOT)/scripts $(SPK_ROOT)/conf $(SPK_ROOT)/WIZARD_UIFILES
 	mkdir -p $(PACKAGE_ROOT)
 	cp synology/INFO $(SPK_ROOT)/INFO
+	sed -i.bak 's/^version="[^"]*"/version="$(PKG_VERSION)"/' $(SPK_ROOT)/INFO
+	rm -f $(SPK_ROOT)/INFO.bak
 	cp synology/scripts/preinst synology/scripts/postinst synology/scripts/preuninst synology/scripts/postuninst synology/scripts/start-stop-status $(SPK_ROOT)/scripts/
 	cp synology/conf/privilege synology/conf/resource $(SPK_ROOT)/conf/
 	cp synology/WIZARD_UIFILES/install_uifile $(SPK_ROOT)/WIZARD_UIFILES/

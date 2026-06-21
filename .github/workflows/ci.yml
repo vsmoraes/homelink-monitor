@@ -96,3 +96,25 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  spk:
+    name: Synology SPK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build SPK
+        run: make spk VERSION=0.0.0-0000
+
+      - name: Verify SPK contents
+        run: |
+          tar -tf dist/homelink-monitor-0.0.0-0000.spk | tee /tmp/spk-files.txt
+          grep -qx "INFO" /tmp/spk-files.txt
+          grep -qx "PACKAGE_ICON.PNG" /tmp/spk-files.txt
+          grep -qx "PACKAGE_ICON_256.PNG" /tmp/spk-files.txt
+          grep -qx "package.tgz" /tmp/spk-files.txt
+          grep -qx "scripts/start-stop-status" /tmp/spk-files.txt
