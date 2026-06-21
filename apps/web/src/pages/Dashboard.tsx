@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Col, Progress, Row, Space, Statistic, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Progress, Row, Select, Space, Statistic, Tag, Typography, message } from 'antd';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Area, AreaChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useEffect, useState } from 'react';
@@ -8,8 +8,9 @@ import type { DNSCheck, LatencyCheck, SpeedTest, Summary } from '../types';
 import { localTime, mbps, ms, number } from '../utils/format';
 import { statusColor, statusText } from '../utils/status';
 
-const latencyColors = ['#18c98f', '#13b8c8', '#7be84d', '#f5a524', '#597ef7', '#eb2f96'];
-const dnsColors = ['#13b8c8', '#18c98f', '#7be84d', '#f5a524', '#597ef7', '#eb2f96'];
+const latencyColors = ['#18c98f', '#13b8c8'];
+const dnsColors = ['#18c98f', '#13b8c8'];
+const allSeries = '__all__';
 const seriesKey = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_');
 
 export default function Dashboard() {
@@ -17,6 +18,8 @@ export default function Dashboard() {
   const [speedTests, setSpeedTests] = useState<SpeedTest[]>([]);
   const [latencyChecks, setLatencyChecks] = useState<LatencyCheck[]>([]);
   const [dnsChecks, setDnsChecks] = useState<DNSCheck[]>([]);
+  const [focusedLatencyTarget, setFocusedLatencyTarget] = useState(allSeries);
+  const [focusedDNSDomain, setFocusedDNSDomain] = useState(allSeries);
   const [loading, setLoading] = useState(true);
   const [startingSpeedTest, setStartingSpeedTest] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -73,15 +76,25 @@ export default function Dashboard() {
     .filter((item) => item.success)
     .map((item) => ({ time: localTime(item.startedAt), download: item.downloadMbps, upload: item.uploadMbps }));
   const latencyTargets = Array.from(new Set(latencyChecks.map((item) => item.target)));
-  const latencyChart = [...latencyChecks]
+  const allLatencyChart = [...latencyChecks]
     .reverse()
     .filter((item) => item.success)
     .map((item) => ({ time: localTime(item.checkedAt), [seriesKey(item.target)]: item.latencyMs }));
+  const focusedLatencyChart = [...latencyChecks]
+    .reverse()
+    .filter((item) => item.success && item.target === focusedLatencyTarget)
+    .map((item) => ({ time: localTime(item.checkedAt), value: item.latencyMs }));
+  const latencyChart = focusedLatencyTarget === allSeries ? allLatencyChart : focusedLatencyChart;
   const dnsDomains = Array.from(new Set(dnsChecks.map((item) => item.domain)));
-  const dnsChart = [...dnsChecks]
+  const allDNSChart = [...dnsChecks]
     .reverse()
     .filter((item) => item.success)
     .map((item) => ({ time: localTime(item.checkedAt), [seriesKey(item.domain)]: item.durationMs }));
+  const focusedDNSChart = [...dnsChecks]
+    .reverse()
+    .filter((item) => item.success && item.domain === focusedDNSDomain)
+    .map((item) => ({ time: localTime(item.checkedAt), value: item.durationMs }));
+  const dnsChart = focusedDNSDomain === allSeries ? allDNSChart : focusedDNSChart;
   const failureCount = latencyChecks.filter((item) => !item.success).length
     + dnsChecks.filter((item) => !item.success).length
     + speedTests.filter((item) => !item.success).length;
@@ -179,16 +192,23 @@ export default function Dashboard() {
                     <div className="trend-section compact">
                       <div className="trend-heading">
                         <Typography.Text strong>Latency</Typography.Text>
-                        <Typography.Text type="secondary">Avg {ms(summary.latency24h.avgMs)}</Typography.Text>
+                        <Select
+                          value={focusedLatencyTarget}
+                          onChange={setFocusedLatencyTarget}
+                          className="chart-focus-select compact"
+                          options={[{ value: allSeries, label: 'All targets' }, ...latencyTargets.map((value) => ({ value, label: value }))]}
+                        />
                       </div>
                       <ResponsiveContainer width="100%" height={150}>
                   <LineChart data={latencyChart}>
                     <XAxis dataKey="time" hide />
                     <YAxis />
                     <Tooltip />
-                    {latencyTargets.map((target, index) => (
-                      <Line key={target} type="monotone" dataKey={seriesKey(target)} stroke={latencyColors[index % latencyColors.length]} dot={false} name={target} connectNulls />
-                    ))}
+                    {focusedLatencyTarget === allSeries
+                      ? latencyTargets.map((target, index) => (
+                        <Line key={target} type="monotone" dataKey={seriesKey(target)} stroke={latencyColors[index % latencyColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} name={target} connectNulls />
+                      ))
+                      : <Line type="monotone" dataKey="value" stroke={latencyColors[0]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} name={focusedLatencyTarget} />}
                   </LineChart>
                 </ResponsiveContainer>
                     </div>
@@ -197,16 +217,23 @@ export default function Dashboard() {
                     <div className="trend-section compact">
                       <div className="trend-heading">
                         <Typography.Text strong>DNS</Typography.Text>
-                        <Typography.Text type="secondary">{dnsChecks.length} samples</Typography.Text>
+                        <Select
+                          value={focusedDNSDomain}
+                          onChange={setFocusedDNSDomain}
+                          className="chart-focus-select compact"
+                          options={[{ value: allSeries, label: 'All domains' }, ...dnsDomains.map((value) => ({ value, label: value }))]}
+                        />
                       </div>
                       <ResponsiveContainer width="100%" height={150}>
                   <LineChart data={dnsChart}>
                     <XAxis dataKey="time" hide />
                     <YAxis />
                     <Tooltip />
-                    {dnsDomains.map((domain, index) => (
-                      <Line key={domain} type="monotone" dataKey={seriesKey(domain)} stroke={dnsColors[index % dnsColors.length]} dot={false} name={domain} connectNulls />
-                    ))}
+                    {focusedDNSDomain === allSeries
+                      ? dnsDomains.map((domain, index) => (
+                        <Line key={domain} type="monotone" dataKey={seriesKey(domain)} stroke={dnsColors[index % dnsColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} name={domain} connectNulls />
+                      ))
+                      : <Line type="monotone" dataKey="value" stroke={dnsColors[0]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} name={focusedDNSDomain} />}
                   </LineChart>
                 </ResponsiveContainer>
                     </div>

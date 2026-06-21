@@ -23,7 +23,7 @@ spk: spk-clean spk-structure spk-build-artifacts
 	$(MAKE) spk-validate
 	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf $(SPK_ROOT)/package.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project ui
 	mkdir -p $(DIST_DIR)
-	COPYFILE_DISABLE=1 tar --format ustar -C $(SPK_ROOT) -cf $(SPK_FILE) INFO package.tgz conf scripts WIZARD_UIFILES
+	COPYFILE_DISABLE=1 tar --format ustar -C $(SPK_ROOT) -cf $(SPK_FILE) INFO PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG package.tgz conf scripts WIZARD_UIFILES
 	@echo "Created $(SPK_FILE)"
 
 spk-clean:
@@ -79,6 +79,8 @@ spk-validate:
 	test -f synology/notification-helper.sh
 	test -f synology/WIZARD_UIFILES/install_uifile
 	test -f $(SPK_ROOT)/INFO
+	test -f $(SPK_ROOT)/PACKAGE_ICON.PNG
+	test -f $(SPK_ROOT)/PACKAGE_ICON_256.PNG
 	test -x $(SPK_ROOT)/scripts/preinst
 	test -x $(SPK_ROOT)/scripts/postinst
 	test -x $(SPK_ROOT)/scripts/preuninst

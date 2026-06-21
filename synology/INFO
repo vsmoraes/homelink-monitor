@@ -1,6 +1,6 @@
 package="homelink-monitor"
 displayname="HomeLink Monitor"
-version="0.1.0-0008"
+version="0.1.0-0009"
 description="Local network and internet connection monitor for Synology DSM"
 maintainer="Vinicius Moraes"
 arch="noarch"

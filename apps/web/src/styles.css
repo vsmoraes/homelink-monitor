@@ -263,6 +263,14 @@ body {
   text-align: right;
 }
 
+.chart-focus-select {
+  min-width: 180px;
+}
+
+.chart-focus-select.compact {
+  min-width: 150px;
+}
+
 .settings-toolbar,
 .settings-card {
   border-radius: 8px;
