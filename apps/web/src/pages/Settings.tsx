@@ -1,5 +1,5 @@
-import { Alert, Button, Card, Form, Input, InputNumber, Space, Switch, message } from 'antd';
-import { ReloadOutlined, SaveOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Space, Switch, Typography, message } from 'antd';
+import { FieldTimeOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined, WifiOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import Page from '../components/Page';
@@ -15,12 +15,14 @@ export default function SettingsPage() {
   const [error, setError] = useState<Error | null>(null);
   const [saveError, setSaveError] = useState<Error | null>(null);
   const [saved, setSaved] = useState(false);
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
       const settings = await api.settings();
       form.setFieldsValue({ ...settings, latencyTargetsText: joinLines(settings.latencyTargets), dnsDomainsText: joinLines(settings.dnsDomains) });
+      setMonitoringEnabled(settings.monitoringEnabled);
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -38,46 +40,148 @@ export default function SettingsPage() {
     setSaved(false);
     setSaveError(null);
     try {
-      const settings: Settings = { ...values, latencyTargets: splitLines(values.latencyTargetsText), dnsDomains: splitLines(values.dnsDomainsText) };
+      const nextMonitoringEnabled = typeof values.monitoringEnabled === 'boolean' ? values.monitoringEnabled : monitoringEnabled;
+      const settings: Settings = {
+        ...values,
+        monitoringEnabled: nextMonitoringEnabled,
+        latencyTargets: splitLines(values.latencyTargetsText),
+        dnsDomains: splitLines(values.dnsDomainsText),
+      };
       const savedSettings = await api.saveSettings(settings);
       form.setFieldsValue({ ...savedSettings, latencyTargetsText: joinLines(savedSettings.latencyTargets), dnsDomainsText: joinLines(savedSettings.dnsDomains) });
+      setMonitoringEnabled(savedSettings.monitoringEnabled);
       setSaved(true);
       message.success('Settings saved');
+      return true;
     } catch (err) {
       setSaveError(err as Error);
       message.error((err as Error).message);
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const saveMonitoringEnabled = async (nextMonitoringEnabled: boolean) => {
+    const previous = form.getFieldValue('monitoringEnabled') as boolean | undefined;
+    setMonitoringEnabled(nextMonitoringEnabled);
+    form.setFieldValue('monitoringEnabled', nextMonitoringEnabled);
+    const ok = await save({ ...form.getFieldsValue(true), monitoringEnabled: nextMonitoringEnabled });
+    if (!ok) {
+      setMonitoringEnabled(Boolean(previous));
+      form.setFieldValue('monitoringEnabled', previous);
+    }
+  };
+
   return (
     <Page title="Settings" loading={loading} error={error} actions={<Button icon={<ReloadOutlined />} onClick={() => void load()}>Reload</Button>}>
-      <Card>
-        {saved ? <Alert type="success" showIcon message="Settings saved" className="page-alert" /> : null}
-        {saveError ? <Alert type="error" showIcon message={saveError.message} className="page-alert" /> : null}
+      <Space direction="vertical" size="large" className="full-width">
+        {saved ? <Alert type="success" showIcon message="Settings saved" /> : null}
+        {saveError ? <Alert type="error" showIcon message={saveError.message} /> : null}
         <Form layout="vertical" form={form} onFinish={save}>
-          <Form.Item name="monitoringEnabled" label="Monitoring" valuePropName="checked"><Switch /></Form.Item>
-          <Form.Item name="speedTestCommand" label="Speed test command"><Input /></Form.Item>
-          <Space wrap size="large">
-            <Form.Item name="speedTestScheduleMinutes" label="Speed test schedule minutes"><InputNumber min={0} /></Form.Item>
-            <Form.Item name="latencyIntervalSeconds" label="Latency interval seconds"><InputNumber min={10} /></Form.Item>
-            <Form.Item name="dnsIntervalSeconds" label="DNS interval seconds"><InputNumber min={10} /></Form.Item>
-            <Form.Item name="outageFailureThreshold" label="Outage failure threshold"><InputNumber min={1} /></Form.Item>
-          </Space>
-          <Space wrap size="large">
-            <Form.Item name="minDownloadMbps" label="Minimum download Mbps"><InputNumber min={0} /></Form.Item>
-            <Form.Item name="minUploadMbps" label="Minimum upload Mbps"><InputNumber min={0} /></Form.Item>
-            <Form.Item name="maxLatencyMs" label="Max latency ms"><InputNumber min={1} /></Form.Item>
-          </Space>
-          <Form.Item name="routerIp" label="Router target"><Input placeholder="192.168.1.1:80" /></Form.Item>
-          <Form.Item name="latencyTargetsText" label="Latency targets"><Input.TextArea rows={4} /></Form.Item>
-          <Form.Item name="dnsDomainsText" label="DNS domains"><Input.TextArea rows={4} /></Form.Item>
-          <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} disabled={saving}>
-            {saving ? 'Saving' : 'Save'}
-          </Button>
+          <Card className="settings-toolbar">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} md={14}>
+                <Space direction="vertical" size={2}>
+                  <Typography.Text strong>Monitoring service</Typography.Text>
+                  <Typography.Text type="secondary">Enable or pause all background checks without losing history.</Typography.Text>
+                </Space>
+              </Col>
+              <Col xs={24} md={10} className="settings-actions">
+                <Switch
+                  checked={Boolean(monitoringEnabled)}
+                  checkedChildren="Enabled"
+                  unCheckedChildren="Paused"
+                  loading={saving}
+                  disabled={saving}
+                  onChange={(checked) => void saveMonitoringEnabled(checked)}
+                />
+                <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} disabled={saving}>
+                  {saving ? 'Saving' : 'Save changes'}
+                </Button>
+              </Col>
+            </Row>
+          </Card>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title={<Space><ThunderboltOutlined />Speed test</Space>} className={`settings-card ${monitoringEnabled ? '' : 'settings-card-disabled'}`}>
+                <Form.Item name="speedTestCommand" label="Command">
+                  <Input disabled={!monitoringEnabled} placeholder="speedtest --accept-license --accept-gdpr --format=json" />
+                </Form.Item>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="speedTestScheduleMinutes" label="Run every">
+                      <InputNumber min={0} addonAfter="minutes" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="outageFailureThreshold" label="Outage threshold">
+                      <InputNumber min={1} addonAfter="failed rounds" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+
+            <Col xs={24} lg={12}>
+              <Card title={<Space><FieldTimeOutlined />Intervals</Space>} className={`settings-card ${monitoringEnabled ? '' : 'settings-card-disabled'}`}>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="latencyIntervalSeconds" label="Latency checks">
+                      <InputNumber min={10} addonAfter="seconds" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="dnsIntervalSeconds" label="DNS checks">
+                      <InputNumber min={10} addonAfter="seconds" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col xs={24} sm={8}>
+                    <Form.Item name="minDownloadMbps" label="Min download">
+                      <InputNumber min={0} addonAfter="Mbps" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={8}>
+                    <Form.Item name="minUploadMbps" label="Min upload">
+                      <InputNumber min={0} addonAfter="Mbps" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={8}>
+                    <Form.Item name="maxLatencyMs" label="Max latency">
+                      <InputNumber min={1} addonAfter="ms" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+
+            <Col xs={24}>
+              <Card title={<Space><WifiOutlined />Targets</Space>} className={`settings-card ${monitoringEnabled ? '' : 'settings-card-disabled'}`}>
+                <Row gutter={16}>
+                  <Col xs={24} lg={8}>
+                    <Form.Item name="routerIp" label="Router target">
+                      <Input disabled={!monitoringEnabled} placeholder="192.168.1.1:80" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} lg={8}>
+                    <Form.Item name="latencyTargetsText" label="Latency targets">
+                      <Input.TextArea rows={5} disabled={!monitoringEnabled} placeholder={'1.1.1.1:53\n8.8.8.8:53'} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} lg={8}>
+                    <Form.Item name="dnsDomainsText" label="DNS domains">
+                      <Input.TextArea rows={5} disabled={!monitoringEnabled} placeholder={'google.com\ncloudflare.com'} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          </Row>
         </Form>
-      </Card>
+      </Space>
     </Page>
   );
 }

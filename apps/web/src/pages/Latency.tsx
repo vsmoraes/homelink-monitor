@@ -38,7 +38,7 @@ export default function Latency() {
             <LineChart data={chart}><XAxis dataKey="time" hide /><YAxis /><Tooltip /><Line type="monotone" dataKey="latency" stroke="#1677ff" dot={false} /></LineChart>
           </ResponsiveContainer>
         </Card>
-        <Table rowKey="id" dataSource={items} columns={[
+        <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[
           { title: 'Checked', dataIndex: 'checkedAt', render: localTime },
           { title: 'Target', dataIndex: 'target' },
           { title: 'Latency', render: (_, r) => ms(r.latencyMs) },

@@ -57,3 +57,54 @@ func TestSummaryHandlerUsesRealDB(t *testing.T) {
 		t.Fatalf("unexpected summary: %#v", summary)
 	}
 }
+
+func TestSettingsHandlerPersistsMonitoringDisabled(t *testing.T) {
+	_, st := testutil.DB(t)
+	authService := auth.NewService(st)
+	if err := authService.EnsureInitialAdmin(context.Background(), "admin", "password123"); err != nil {
+		t.Fatal(err)
+	}
+	server := httpapi.New(st, monitoring.NewService(st, slog.Default()), authService, slog.Default(), t.TempDir()).Routes()
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"password123"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRes := httptest.NewRecorder()
+	server.ServeHTTP(loginRes, loginReq)
+	if loginRes.Code != http.StatusOK {
+		t.Fatalf("login status %d body %s", loginRes.Code, loginRes.Body.String())
+	}
+	cookies := loginRes.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie")
+	}
+
+	settings := domain.DefaultSettings()
+	settings.MonitoringEnabled = false
+	body, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saveReq := httptest.NewRequest(http.MethodPut, "/api/settings", bytes.NewReader(body))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveReq.AddCookie(cookies[0])
+	saveRes := httptest.NewRecorder()
+	server.ServeHTTP(saveRes, saveReq)
+	if saveRes.Code != http.StatusOK {
+		t.Fatalf("save status %d body %s", saveRes.Code, saveRes.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	getReq.AddCookie(cookies[0])
+	getRes := httptest.NewRecorder()
+	server.ServeHTTP(getRes, getReq)
+	if getRes.Code != http.StatusOK {
+		t.Fatalf("get status %d body %s", getRes.Code, getRes.Body.String())
+	}
+	var got domain.Settings
+	if err := json.NewDecoder(getRes.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.MonitoringEnabled {
+		t.Fatalf("expected monitoring disabled, got %#v", got)
+	}
+}

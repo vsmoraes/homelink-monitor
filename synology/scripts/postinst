@@ -7,6 +7,7 @@ PKG_VAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG_NAME/var}"
 CONFIG_DIR="$PKG_VAR/config"
 APP_ENV="$CONFIG_DIR/app.env"
 TEMPLATE="$PKG_DEST/.env.template"
+LAUNCHER_CONFIG="$PKG_DEST/ui/config"
 
 fail() {
   echo "$1" >&2
@@ -44,12 +45,6 @@ first_value() {
   return 1
 }
 
-log_info() {
-  if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
-    printf '%s\n' "$1" >> "$SYNOPKG_TEMP_LOGFILE"
-  fi
-}
-
 sed_escape() {
   printf '%s' "$1" | sed 's/[\/&]/\\&/g'
 }
@@ -66,8 +61,6 @@ ADMIN_PASSWORD="$(first_value ADMIN_PASSWORD wizard_admin_password || printf '%s
 ADMIN_PASSWORD_CONFIRM="$(first_value ADMIN_PASSWORD_CONFIRM wizard_admin_password_confirm || printf '%s' "")"
 HTTP_PORT="$(first_value HTTP_PORT wizard_http_port || printf '%s' "8810")"
 DSM_NOTIFICATIONS_ENABLED="$(first_value DSM_NOTIFICATIONS_ENABLED wizard_dsm_notifications_enabled || printf '%s' "true")"
-
-log_info "HomeLink Monitor wizard values captured: admin_username_len=${#ADMIN_USERNAME}, admin_password_len=${#ADMIN_PASSWORD}, http_port=$HTTP_PORT, dsm_notifications=$DSM_NOTIFICATIONS_ENABLED"
 
 [ -n "$ADMIN_USERNAME" ] || fail "Admin username cannot be empty."
 [ -n "$ADMIN_PASSWORD" ] || fail "Admin password cannot be empty."
@@ -91,6 +84,15 @@ sed \
   -e "s/__DSM_NOTIFICATIONS_ENABLED__/$(sed_escape "$DSM_NOTIFICATIONS_ENABLED")/g" \
   "$TEMPLATE" > "$APP_ENV"
 chmod 600 "$APP_ENV"
+
+if [ -f "$LAUNCHER_CONFIG" ]; then
+  tmp_launcher_config="$LAUNCHER_CONFIG.tmp"
+  sed \
+    -e "s/__HTTP_PORT__/$(sed_escape "$HTTP_PORT")/g" \
+    -e 's/__HOST__/%HOST%/g' \
+    "$LAUNCHER_CONFIG" > "$tmp_launcher_config"
+  mv "$tmp_launcher_config" "$LAUNCHER_CONFIG"
+fi
 
 echo "HomeLink Monitor configuration written to $APP_ENV."
 echo "The package can now be started from DSM Package Center."

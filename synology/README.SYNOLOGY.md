@@ -66,6 +66,14 @@ make spk SPK_GOARCH=arm64
 5. Start the package from Package Center.
 6. Open `http://SYNOLOGY_IP:8810`, or the port selected in the wizard.
 
+The package also installs a DSM launcher entry named `HomeLink Monitor`. Opening it from DSM opens a new browser tab at:
+
+```text
+http://CURRENT_DSM_HOST:<wizard port>/
+```
+
+For example, if you opened DSM at `http://192.168.1.20:5000` and selected port `8810`, the launcher opens `http://192.168.1.20:8810/`.
+
 ## Install Wizard
 
 The wizard asks for:

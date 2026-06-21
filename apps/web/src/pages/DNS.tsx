@@ -23,7 +23,7 @@ export default function DNS() {
             <LineChart data={chart}><XAxis dataKey="time" hide /><YAxis /><Tooltip /><Line type="monotone" dataKey="duration" stroke="#13c2c2" dot={false} /></LineChart>
           </ResponsiveContainer>
         </Card>
-        <Table rowKey="id" dataSource={items} columns={[
+        <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[
           { title: 'Checked', dataIndex: 'checkedAt', render: localTime },
           { title: 'Domain', dataIndex: 'domain' },
           { title: 'Duration', render: (_, r) => ms(r.durationMs) },

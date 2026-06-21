@@ -1,0 +1,13 @@
+{
+  "HomeLinkMonitor": {
+    "type": "url",
+    "title": "HomeLink Monitor",
+    "desc": "Local network and internet connection monitor",
+    "protocol": "http",
+    "port": "__HTTP_PORT__",
+    "url": "http://__HOST__:__HTTP_PORT__/",
+    "allUsers": true,
+    "hidden": false,
+    "icon": "images/icon.png"
+  }
+}

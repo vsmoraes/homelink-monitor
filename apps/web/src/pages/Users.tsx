@@ -78,7 +78,7 @@ export default function Users() {
 
   return (
     <Page title="Users" loading={loading} error={error} actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Add User</Button>}>
-      <Table rowKey="id" dataSource={items} columns={[
+      <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[
         { title: 'Username', dataIndex: 'username' },
         { title: 'Role', dataIndex: 'role' },
         { title: 'Created', dataIndex: 'createdAt', render: localTime },

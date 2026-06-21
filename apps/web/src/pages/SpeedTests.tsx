@@ -97,7 +97,7 @@ export default function SpeedTests() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
-        <Table rowKey="id" dataSource={items} columns={[
+        <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[
           { title: 'Started', dataIndex: 'startedAt', render: localTime },
           { title: 'Download', render: (_, r) => mbps(r.downloadMbps) },
           { title: 'Upload', render: (_, r) => mbps(r.uploadMbps) },

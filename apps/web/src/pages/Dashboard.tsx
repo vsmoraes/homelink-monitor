@@ -1,14 +1,18 @@
 import { Alert, Button, Card, Col, Progress, Row, Space, Statistic, Tag, Typography, message } from 'antd';
-import { CloudServerOutlined, GlobalOutlined, ReloadOutlined, ThunderboltOutlined, WifiOutlined } from '@ant-design/icons';
+import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Area, AreaChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import Page from '../components/Page';
-import type { Summary } from '../types';
+import type { DNSCheck, LatencyCheck, SpeedTest, Summary } from '../types';
 import { localTime, mbps, ms, number } from '../utils/format';
 import { statusColor, statusText } from '../utils/status';
 
 export default function Dashboard() {
   const [summary, setSummary] = useState<Summary>();
+  const [speedTests, setSpeedTests] = useState<SpeedTest[]>([]);
+  const [latencyChecks, setLatencyChecks] = useState<LatencyCheck[]>([]);
+  const [dnsChecks, setDnsChecks] = useState<DNSCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [startingSpeedTest, setStartingSpeedTest] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -16,7 +20,16 @@ export default function Dashboard() {
   const load = async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      setSummary(await api.summary());
+      const [nextSummary, speedHistory, latencyHistory, dnsHistory] = await Promise.all([
+        api.summary(),
+        api.speedTests(),
+        api.latency(),
+        api.dnsChecks(),
+      ]);
+      setSummary(nextSummary);
+      setSpeedTests(speedHistory.items);
+      setLatencyChecks(latencyHistory.items);
+      setDnsChecks(dnsHistory.items);
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -51,15 +64,30 @@ export default function Dashboard() {
   const downloadPercent = summary?.latestSpeedTest?.downloadMbps && summary.settings.minDownloadMbps
     ? Math.min(100, Math.round((summary.latestSpeedTest.downloadMbps / summary.settings.minDownloadMbps) * 100))
     : 0;
+  const speedChart = [...speedTests]
+    .reverse()
+    .filter((item) => item.success)
+    .map((item) => ({ time: localTime(item.startedAt), download: item.downloadMbps, upload: item.uploadMbps }));
+  const latencyChart = [...latencyChecks]
+    .reverse()
+    .filter((item) => item.success)
+    .map((item) => ({ time: localTime(item.checkedAt), latency: item.latencyMs, target: item.target }));
+  const dnsChart = [...dnsChecks]
+    .reverse()
+    .filter((item) => item.success)
+    .map((item) => ({ time: localTime(item.checkedAt), duration: item.durationMs, domain: item.domain }));
+  const failureCount = latencyChecks.filter((item) => !item.success).length
+    + dnsChecks.filter((item) => !item.success).length
+    + speedTests.filter((item) => !item.success).length;
 
   return (
     <Page title="Dashboard" loading={loading} error={error} actions={<Button icon={<ReloadOutlined />} onClick={() => void load()}>Refresh</Button>}>
       {summary ? (
-        <Space direction="vertical" size="large" className="full-width dashboard-grid">
+        <div className="dashboard-grid">
           {summary.speedTestIsRunning ? <Alert type="info" showIcon message="Speed test is running" description="Results will appear here automatically when the command finishes." /> : null}
           {summary.latestSpeedTest?.success === false ? <Alert type="warning" showIcon message={summary.latestSpeedTest.error} /> : null}
-          <Row gutter={[16, 16]} align="stretch">
-            <Col xs={24} xl={14}>
+          <Row gutter={[16, 16]} align="top">
+            <Col xs={24} xl={16}>
               <Card className="network-hero">
                 <div className="hero-topline">
                   <div>
@@ -79,23 +107,23 @@ export default function Dashboard() {
                     {summary.speedTestIsRunning ? 'Running Speed Test' : 'Run Speed Test'}
                   </Button>
                 </div>
-                <div className="network-path">
-                  <div className="network-node"><CloudServerOutlined /><span>NAS</span></div>
-                  <div className="network-link" />
-                  <div className="network-node"><WifiOutlined /><span>Router</span></div>
-                  <div className="network-link" />
-                  <div className="network-node"><GlobalOutlined /><span>Internet</span></div>
-                </div>
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={8}><Statistic title="Download" value={mbps(summary.latestSpeedTest?.downloadMbps)} /></Col>
-                  <Col xs={24} sm={8}><Statistic title="Upload" value={mbps(summary.latestSpeedTest?.uploadMbps)} /></Col>
-                  <Col xs={24} sm={8}><Statistic title="Ping" value={ms(summary.latestSpeedTest?.pingMs ?? summary.latestLatency?.latencyMs)} /></Col>
+                <Row gutter={[16, 16]} className="overview-strip">
+                  <Col xs={12} lg={6}><Statistic title="Download" value={mbps(summary.latestSpeedTest?.downloadMbps)} /></Col>
+                  <Col xs={12} lg={6}><Statistic title="Upload" value={mbps(summary.latestSpeedTest?.uploadMbps)} /></Col>
+                  <Col xs={12} lg={6}><Statistic title="Ping" value={ms(summary.latestSpeedTest?.pingMs ?? summary.latestLatency?.latencyMs)} /></Col>
+                  <Col xs={12} lg={6}><Statistic title="DNS" value={summary.latestDnsCheck?.success ? 'Healthy' : 'Failed'} /></Col>
+                </Row>
+                <Row gutter={[16, 16]} className="check-volume-strip">
+                  <Col xs={12} md={6}><Statistic title="Latency Checks" value={latencyChecks.length} /></Col>
+                  <Col xs={12} md={6}><Statistic title="DNS Checks" value={dnsChecks.length} /></Col>
+                  <Col xs={12} md={6}><Statistic title="Speed Tests" value={speedTests.length} /></Col>
+                  <Col xs={12} md={6}><Statistic title="Failures" value={failureCount} /></Col>
                 </Row>
               </Card>
             </Col>
-            <Col xs={24} xl={10}>
+            <Col xs={24} xl={8}>
               <Card className="quality-panel">
-                <Space direction="vertical" size="large" className="full-width">
+                <Space direction="vertical" size="middle" className="full-width">
                   <div>
                     <Typography.Text type="secondary">Download target</Typography.Text>
                     <Progress percent={downloadPercent} status={downloadPercent >= 100 ? 'success' : 'normal'} />
@@ -108,21 +136,76 @@ export default function Dashboard() {
                     <span>Last speed test</span>
                     <strong>{localTime(summary.latestSpeedTest?.startedAt)}</strong>
                   </div>
+                  <div className="quality-meta">
+                    <span>Outages 24h</span>
+                    <strong>{summary.outageCount24h}</strong>
+                  </div>
+                  <div className="quality-meta">
+                    <span>Packet loss 24h</span>
+                    <strong>{number(summary.latency24h.packetLoss)}%</strong>
+                  </div>
                 </Space>
               </Card>
             </Col>
           </Row>
           <Row gutter={[16, 16]}>
-            <Col xs={24} md={6}><Card className="metric-tile"><Statistic title="Average Latency 24h" value={ms(summary.latency24h.avgMs)} /></Card></Col>
-            <Col xs={24} md={6}><Card className="metric-tile"><Statistic title="Packet Loss 24h" value={`${number(summary.latency24h.packetLoss)}%`} /></Card></Col>
-            <Col xs={24} md={6}><Card className="metric-tile"><Statistic title="Outages 24h" value={summary.outageCount24h} /></Card></Col>
-            <Col xs={24} md={6}><Card className="metric-tile"><Statistic title="DNS" value={summary.latestDnsCheck?.success ? 'Healthy' : 'Failed'} /></Card></Col>
+            <Col xs={24} xl={16}>
+              <Card title="Recent Trends" className="trend-card">
+                <div className="trend-section">
+                  <div className="trend-heading">
+                    <Typography.Text strong>Speed</Typography.Text>
+                    <Typography.Text type="secondary">
+                      Down {mbps(summary.minDownload24hMbps)} - {mbps(summary.maxDownload24hMbps)} · Up {mbps(summary.minUpload24hMbps)} - {mbps(summary.maxUpload24hMbps)}
+                    </Typography.Text>
+                  </div>
+                  <ResponsiveContainer width="100%" height={190}>
+                  <AreaChart data={speedChart}>
+                    <XAxis dataKey="time" hide />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="download" stroke="#18c98f" fill="#dffbea" name="Download" />
+                    <Area type="monotone" dataKey="upload" stroke="#13b8c8" fill="#dff8fb" name="Upload" />
+                  </AreaChart>
+                </ResponsiveContainer>
+                </div>
+                <Row gutter={[16, 16]}>
+                  <Col xs={24} lg={12}>
+                    <div className="trend-section compact">
+                      <div className="trend-heading">
+                        <Typography.Text strong>Latency</Typography.Text>
+                        <Typography.Text type="secondary">Avg {ms(summary.latency24h.avgMs)}</Typography.Text>
+                      </div>
+                      <ResponsiveContainer width="100%" height={150}>
+                  <LineChart data={latencyChart}>
+                    <XAxis dataKey="time" hide />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="latency" stroke="#18c98f" dot={false} name="Latency" />
+                  </LineChart>
+                </ResponsiveContainer>
+                    </div>
+                  </Col>
+                  <Col xs={24} lg={12}>
+                    <div className="trend-section compact">
+                      <div className="trend-heading">
+                        <Typography.Text strong>DNS</Typography.Text>
+                        <Typography.Text type="secondary">{dnsChecks.length} samples</Typography.Text>
+                      </div>
+                      <ResponsiveContainer width="100%" height={150}>
+                  <LineChart data={dnsChart}>
+                    <XAxis dataKey="time" hide />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="duration" stroke="#13c2c2" dot={false} name="Duration" />
+                  </LineChart>
+                </ResponsiveContainer>
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
           </Row>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={12}><Card title="24h Download Range">{mbps(summary.minDownload24hMbps)} - {mbps(summary.maxDownload24hMbps)}</Card></Col>
-            <Col xs={24} md={12}><Card title="24h Upload Range">{mbps(summary.minUpload24hMbps)} - {mbps(summary.maxUpload24hMbps)}</Card></Col>
-          </Row>
-        </Space>
+        </div>
       ) : null}
     </Page>
   );

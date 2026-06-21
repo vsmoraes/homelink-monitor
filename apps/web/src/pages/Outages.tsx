@@ -14,7 +14,7 @@ export default function Outages() {
   }, []);
   return (
     <Page title="Outages" loading={loading} error={error}>
-      <Table rowKey="id" dataSource={items} columns={[
+      <Table rowKey="id" dataSource={items} scroll={{ x: 'max-content' }} columns={[
         { title: 'Start', dataIndex: 'startedAt', render: localTime },
         { title: 'End', dataIndex: 'endedAt', render: localTime },
         { title: 'Duration', render: (_, r) => duration(r.startedAt, r.endedAt) },

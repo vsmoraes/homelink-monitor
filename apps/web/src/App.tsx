@@ -1,5 +1,5 @@
-import { DashboardOutlined, DatabaseOutlined, GlobalOutlined, LogoutOutlined, SettingOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from '@ant-design/icons';
-import { Button, Layout, Menu, Space, Spin, Typography, message } from 'antd';
+import { DashboardOutlined, DatabaseOutlined, GlobalOutlined, LogoutOutlined, MenuOutlined, SettingOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from '@ant-design/icons';
+import { Button, Drawer, Grid, Layout, Menu, Space, Spin, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { api } from './api/client';
@@ -13,7 +13,7 @@ import SpeedTests from './pages/SpeedTests';
 import Users from './pages/Users';
 import type { User } from './types';
 
-const { Header, Sider, Content } = Layout;
+const { Header, Content } = Layout;
 
 const items = [
   { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
@@ -27,8 +27,11 @@ const items = [
 
 export default function App() {
   const location = useLocation();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     api.me()
@@ -56,17 +59,37 @@ export default function App() {
 
   return (
     <Layout className="app-shell">
-      <Sider breakpoint="lg" collapsedWidth="0" theme="light" className="app-sider">
-        <Typography.Title level={4} className="app-title">Connection Monitor</Typography.Title>
-        <Menu mode="inline" selectedKeys={[location.pathname]} items={items} />
-      </Sider>
-      <Layout>
-        <Header className="app-header">
-          <Space className="header-user">
+      <Header className="app-header">
+        <div className="app-brand">
+          <img src="/logo.png" alt="" />
+          <Typography.Title level={4}>HomeLink Monitor</Typography.Title>
+        </div>
+        {isMobile ? (
+          <Button className="mobile-menu-button" icon={<MenuOutlined />} onClick={() => setNavOpen(true)} />
+        ) : (
+          <Menu mode="horizontal" selectedKeys={[location.pathname]} items={items} className="app-menu" />
+        )}
+        <Space className="header-user desktop-user">
+          <Typography.Text>{user.username}</Typography.Text>
+          <Button icon={<LogoutOutlined />} onClick={() => void logout()}>Logout</Button>
+        </Space>
+      </Header>
+      <Drawer
+        title="HomeLink Monitor"
+        placement="left"
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        width={300}
+      >
+        <Space direction="vertical" size="large" className="full-width">
+          <Menu mode="inline" selectedKeys={[location.pathname]} items={items} onClick={() => setNavOpen(false)} />
+          <Space className="mobile-user">
             <Typography.Text>{user.username}</Typography.Text>
             <Button icon={<LogoutOutlined />} onClick={() => void logout()}>Logout</Button>
           </Space>
-        </Header>
+        </Space>
+      </Drawer>
+      <Layout>
         <Content className="app-content">
           <Routes>
             <Route path="/" element={<Dashboard />} />

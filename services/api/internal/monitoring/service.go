@@ -25,6 +25,8 @@ type Service struct {
 	outbox      *events.Outbox
 }
 
+const speedSchedulePollInterval = 30 * time.Second
+
 func NewService(st *store.Store, log *slog.Logger) *Service {
 	return &Service{store: st, log: log, speedRunner: speedtest.Runner{}}
 }
@@ -94,12 +96,29 @@ func (s *Service) Start(ctx context.Context) {
 	})
 	go s.loop(ctx, "speed", 5*time.Second, func(ctx context.Context) time.Duration {
 		settings, err := s.store.Settings(ctx)
-		if err == nil && settings.MonitoringEnabled && settings.SpeedTestScheduleMinutes > 0 {
-			s.TriggerSpeedTest(ctx)
-			return time.Duration(settings.SpeedTestScheduleMinutes) * time.Minute
+		if err != nil || !settings.MonitoringEnabled || settings.SpeedTestScheduleMinutes <= 0 {
+			return speedSchedulePollInterval
 		}
-		return time.Hour
+		latest, err := s.store.LatestSpeedTest(ctx)
+		if err != nil {
+			s.log.Error("load latest speed test for schedule", "error", err)
+			return speedSchedulePollInterval
+		}
+		if SpeedTestDue(time.Now().UTC(), latest, settings.SpeedTestScheduleMinutes) {
+			s.TriggerSpeedTest(ctx)
+		}
+		return speedSchedulePollInterval
 	})
+}
+
+func SpeedTestDue(now time.Time, latest *domain.SpeedTest, scheduleMinutes int) bool {
+	if scheduleMinutes <= 0 {
+		return false
+	}
+	if latest == nil {
+		return true
+	}
+	return !latest.StartedAt.Add(time.Duration(scheduleMinutes) * time.Minute).After(now)
 }
 
 func (s *Service) loop(ctx context.Context, name string, initialDelay time.Duration, fn func(context.Context) time.Duration) {

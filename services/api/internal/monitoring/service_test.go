@@ -52,3 +52,21 @@ func TestTriggerSpeedTestSurvivesCanceledRequestContext(t *testing.T) {
 		t.Fatalf("unexpected speed test result: %#v", latest)
 	}
 }
+
+func TestSpeedTestDueUsesLatestRunAndSchedule(t *testing.T) {
+	now := time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	latest := &domain.SpeedTest{StartedAt: now.Add(-9 * time.Minute)}
+
+	if monitoring.SpeedTestDue(now, latest, 0) {
+		t.Fatal("disabled schedule should not be due")
+	}
+	if monitoring.SpeedTestDue(now, latest, 10) {
+		t.Fatal("latest run is still inside the schedule window")
+	}
+	if !monitoring.SpeedTestDue(now, &domain.SpeedTest{StartedAt: now.Add(-10 * time.Minute)}, 10) {
+		t.Fatal("latest run at the schedule boundary should be due")
+	}
+	if !monitoring.SpeedTestDue(now, nil, 10) {
+		t.Fatal("missing latest run should be due")
+	}
+}

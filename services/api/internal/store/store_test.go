@@ -48,6 +48,7 @@ func TestSettingsRoundTrip(t *testing.T) {
 	settings := domain.DefaultSettings()
 	settings.MinDownloadMbps = 250
 	settings.LatencyTargets = []string{"router:80"}
+	settings.MonitoringEnabled = false
 	if err := st.SaveSettings(ctx, settings); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestSettingsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.MinDownloadMbps != 250 || len(got.LatencyTargets) != 1 || got.LatencyTargets[0] != "router:80" {
+	if got.MinDownloadMbps != 250 || len(got.LatencyTargets) != 1 || got.LatencyTargets[0] != "router:80" || got.MonitoringEnabled {
 		t.Fatalf("unexpected settings: %#v", got)
 	}
 }

@@ -28,7 +28,10 @@ export default function Login({ onLogin }: Props) {
   return (
     <div className="login-page">
       <Card className="login-card">
-        <Typography.Title level={3}>Connection Monitor</Typography.Title>
+        <div className="login-brand">
+          <img src="/logo.png" alt="" />
+          <Typography.Title level={3}>HomeLink Monitor</Typography.Title>
+        </div>
         {error ? <Alert type="error" showIcon message={error.message} className="page-alert" /> : null}
         <Form layout="vertical" onFinish={submit}>
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>

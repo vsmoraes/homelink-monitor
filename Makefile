@@ -21,7 +21,7 @@ run:
 
 spk: spk-clean spk-structure spk-build-artifacts
 	$(MAKE) spk-validate
-	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf $(SPK_ROOT)/package.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project
+	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf $(SPK_ROOT)/package.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project ui
 	mkdir -p $(DIST_DIR)
 	COPYFILE_DISABLE=1 tar --format ustar -C $(SPK_ROOT) -cf $(SPK_FILE) INFO package.tgz conf scripts WIZARD_UIFILES
 	@echo "Created $(SPK_FILE)"
@@ -45,12 +45,15 @@ spk-structure:
 	cp synology/templates/app.env.template $(PACKAGE_ROOT)/.env.template
 	cp synology/notification-helper.sh $(PACKAGE_ROOT)/notification-helper.sh
 	cp synology/README.SYNOLOGY.md $(PACKAGE_ROOT)/README.SYNOLOGY.md
+	mkdir -p $(PACKAGE_ROOT)/ui/images
+	cp synology/templates/ui/config synology/templates/ui/HomeLinkMonitor.js $(PACKAGE_ROOT)/ui/
 	mkdir -p $(PACKAGE_ROOT)/scripts
 	cp synology/scripts/start-stop-status $(PACKAGE_ROOT)/scripts/start-stop-status
 	chmod 755 $(SPK_ROOT)/scripts/preinst $(SPK_ROOT)/scripts/postinst $(SPK_ROOT)/scripts/preuninst $(SPK_ROOT)/scripts/postuninst $(SPK_ROOT)/scripts/start-stop-status
 	chmod 755 $(PACKAGE_ROOT)/notification-helper.sh $(PACKAGE_ROOT)/scripts/start-stop-status
-	if [ -f synology/PACKAGE_ICON.PNG ]; then cp synology/PACKAGE_ICON.PNG $(SPK_ROOT)/PACKAGE_ICON.PNG; else printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=' | base64 -d > $(SPK_ROOT)/PACKAGE_ICON.PNG 2>/dev/null || printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=' | base64 -D > $(SPK_ROOT)/PACKAGE_ICON.PNG; fi
-	if [ -f synology/PACKAGE_ICON_256.PNG ]; then cp synology/PACKAGE_ICON_256.PNG $(SPK_ROOT)/PACKAGE_ICON_256.PNG; else cp $(SPK_ROOT)/PACKAGE_ICON.PNG $(SPK_ROOT)/PACKAGE_ICON_256.PNG; fi
+	if [ -f synology/PACKAGE_ICON.PNG ]; then cp synology/PACKAGE_ICON.PNG $(SPK_ROOT)/PACKAGE_ICON.PNG; elif [ -f img/logo.png ]; then cp img/logo.png $(SPK_ROOT)/PACKAGE_ICON.PNG; else printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=' | base64 -d > $(SPK_ROOT)/PACKAGE_ICON.PNG 2>/dev/null || printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=' | base64 -D > $(SPK_ROOT)/PACKAGE_ICON.PNG; fi
+	if [ -f synology/PACKAGE_ICON_256.PNG ]; then cp synology/PACKAGE_ICON_256.PNG $(SPK_ROOT)/PACKAGE_ICON_256.PNG; elif [ -f img/logo.png ]; then cp img/logo.png $(SPK_ROOT)/PACKAGE_ICON_256.PNG; else cp $(SPK_ROOT)/PACKAGE_ICON.PNG $(SPK_ROOT)/PACKAGE_ICON_256.PNG; fi
+	cp $(SPK_ROOT)/PACKAGE_ICON.PNG $(PACKAGE_ROOT)/ui/images/icon.png
 
 spk-build-artifacts:
 	mkdir -p $(PACKAGE_ROOT)/project/app/web
@@ -85,6 +88,9 @@ spk-validate:
 	test -f $(PACKAGE_ROOT)/project/Dockerfile
 	test -s $(PACKAGE_ROOT)/project/app/connection-monitor
 	test -f $(PACKAGE_ROOT)/project/app/web/index.html
+	test -f $(PACKAGE_ROOT)/ui/config
+	test -f $(PACKAGE_ROOT)/ui/HomeLinkMonitor.js
+	test -f $(PACKAGE_ROOT)/ui/images/icon.png
 	test -f $(PACKAGE_ROOT)/.env.template
 	test -x $(PACKAGE_ROOT)/notification-helper.sh
 	test -f $(SPK_ROOT)/WIZARD_UIFILES/install_uifile
@@ -97,7 +103,7 @@ spk-validate:
 	sh -n synology/scripts/postuninst
 	sh -n synology/scripts/start-stop-status
 	sh -n synology/notification-helper.sh
-	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf /tmp/$(PKG_NAME)-package-validate.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project
+	COPYFILE_DISABLE=1 tar --format ustar -C $(PACKAGE_ROOT) -czf /tmp/$(PKG_NAME)-package-validate.tgz .env.template notification-helper.sh README.SYNOLOGY.md scripts project ui
 	rm -f /tmp/$(PKG_NAME)-package-validate.tgz
 	mkdir -p $(DIST_DIR)
 	@echo "SPK structure validation passed."
