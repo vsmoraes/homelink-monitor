@@ -37,7 +37,7 @@ export default function Login({ onLogin }: Props) {
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>
             <Input prefix={<UserOutlined />} autoComplete="username" />
           </Form.Item>
-          <Form.Item name="password" label="Password" rules={[{ required: true }]}>
+          <Form.Item name="password" label="Password" rules={[{ required: true }, { max: 72 }]}>
             <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={loading} block>

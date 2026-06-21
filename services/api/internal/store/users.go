@@ -100,6 +100,11 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	return err
 }
 
+func (s *Store) DeleteSessionsForUser(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	return err
+}
+
 func (s *Store) DeleteExpiredSessions(ctx context.Context, now time.Time) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, ts(now))
 	return err

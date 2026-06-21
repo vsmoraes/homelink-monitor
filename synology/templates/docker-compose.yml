@@ -13,4 +13,8 @@ services:
       - /var/packages/homelink-monitor/var/data:/data
       - /var/packages/homelink-monitor/var/config:/config:ro
       - /var/packages/homelink-monitor/var/events/outbox:/events/outbox
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped

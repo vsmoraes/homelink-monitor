@@ -21,11 +21,16 @@ type contextKey string
 const userKey contextKey = "user"
 
 type Service struct {
-	store *store.Store
+	store        *store.Store
+	cookieSecure bool
 }
 
 func NewService(st *store.Store) *Service {
 	return &Service{store: st}
+}
+
+func (s *Service) SetCookieSecure(secure bool) {
+	s.cookieSecure = secure
 }
 
 func (s *Service) EnsureInitialAdmin(ctx context.Context, username, password string) error {
@@ -39,6 +44,9 @@ func (s *Service) EnsureInitialAdmin(ctx context.Context, username, password str
 	if strings.TrimSpace(username) == "" || password == "" {
 		return errors.New("ADMIN_USERNAME and ADMIN_PASSWORD are required when creating the first user")
 	}
+	if err := ValidateUsername(username); err != nil {
+		return err
+	}
 	hash, err := HashPassword(password)
 	if err != nil {
 		return err
@@ -48,6 +56,10 @@ func (s *Service) EnsureInitialAdmin(ctx context.Context, username, password str
 }
 
 func (s *Service) Login(ctx context.Context, username, password string) (string, domain.User, error) {
+	now := time.Now().UTC()
+	if err := s.store.DeleteExpiredSessions(ctx, now); err != nil {
+		return "", domain.User{}, err
+	}
 	user, err := s.store.UserByUsername(ctx, strings.TrimSpace(username))
 	if err != nil {
 		return "", domain.User{}, err
@@ -59,7 +71,6 @@ func (s *Service) Login(ctx context.Context, username, password string) (string,
 	if err != nil {
 		return "", domain.User{}, err
 	}
-	now := time.Now().UTC()
 	if err := s.store.CreateSession(ctx, token, user.ID, now, now.Add(30*24*time.Hour)); err != nil {
 		return "", domain.User{}, err
 	}
@@ -85,28 +96,55 @@ func HashPassword(password string) (string, error) {
 	if len(password) < 8 {
 		return "", errors.New("password must be at least 8 characters")
 	}
+	if len(password) > 72 {
+		return "", errors.New("password must be 72 bytes or less")
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hash), err
 }
 
-func SetSessionCookie(w http.ResponseWriter, token string) {
+func ValidateUsername(username string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return errors.New("username is required")
+	}
+	if len(username) > 64 {
+		return errors.New("username must be 64 characters or less")
+	}
+	for _, r := range username {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+			continue
+		}
+		switch r {
+		case '.', '-', '_', '@':
+			continue
+		default:
+			return errors.New("username may only contain letters, numbers, dot, dash, underscore, and @")
+		}
+	}
+	return nil
+}
+
+func (s *Service) SetSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   s.cookieSecure,
 		MaxAge:   30 * 24 * 60 * 60,
 	})
 }
 
-func ClearSessionCookie(w http.ResponseWriter) {
+func (s *Service) ClearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   s.cookieSecure,
 		MaxAge:   -1,
 	})
 }

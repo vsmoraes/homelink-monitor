@@ -6,11 +6,16 @@ services:
       - "8810:8080"
     volumes:
       - ${DATA_DIR:-./data}:/data
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       - TZ=Europe/Madrid
       - DB_PATH=/data/connection-monitor.db
       - APP_ENV=production
       - STATIC_PATH=/app/apps/web/dist
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?set ADMIN_USERNAME in .env}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE:-false}
     restart: unless-stopped

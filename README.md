@@ -44,6 +44,7 @@ It tracks latency, DNS health, speed tests, outages, and connection status over 
 
 ```bash
 cp .env.example .env
+$EDITOR .env
 make run
 ```
 
@@ -53,7 +54,7 @@ Open:
 http://localhost:8810
 ```
 
-Change the default admin password in `.env` before using it beyond local testing.
+Set a real admin password in `.env`; Compose refuses to start without credentials.
 
 ## Synology
 
@@ -161,6 +162,14 @@ Stop the container before copying the database, or use SQLite online backup tool
 - Do not expose it through QuickConnect.
 - Limit access with DSM Firewall.
 - Use a VPN for remote access.
+
+## Production Notes
+
+- `ADMIN_USERNAME` and `ADMIN_PASSWORD` are required when the first user is created.
+- Set `AUTH_COOKIE_SECURE=true` only when serving the app over HTTPS.
+- Keep `/data` backed up; it contains the SQLite database.
+- The speed test command is configurable by admins and runs inside the unprivileged app container, without a shell.
+- The app rejects cross-origin browser writes and caps API request bodies.
 
 ## Troubleshooting
 

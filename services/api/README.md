@@ -16,5 +16,6 @@ Environment:
 - `DB_PATH`: SQLite path, default `./connection-monitor.db`
 - `STATIC_PATH`: web app static path, default `../../apps/web/dist`
 - `APP_ENV`: informational environment value
-- `ADMIN_USERNAME`: first admin username when the database has no users
-- `ADMIN_PASSWORD`: first admin password when the database has no users
+- `ADMIN_USERNAME`: first admin username when the database has no users; required for first boot
+- `ADMIN_PASSWORD`: first admin password when the database has no users; required for first boot
+- `AUTH_COOKIE_SECURE`: set to `true` only when serving over HTTPS

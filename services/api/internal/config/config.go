@@ -9,6 +9,7 @@ type Config struct {
 	AppEnv                  string
 	AdminUsername           string
 	AdminPassword           string
+	AuthCookieSecure        bool
 	EventOutboxDir          string
 	DSMNotificationsEnabled bool
 }
@@ -19,8 +20,9 @@ func Load() Config {
 		DBPath:                  value("DB_PATH", "./connection-monitor.db"),
 		StaticPath:              value("STATIC_PATH", "../../apps/web/dist"),
 		AppEnv:                  value("APP_ENV", "development"),
-		AdminUsername:           value("ADMIN_USERNAME", "admin"),
-		AdminPassword:           value("ADMIN_PASSWORD", "changeme"),
+		AdminUsername:           os.Getenv("ADMIN_USERNAME"),
+		AdminPassword:           os.Getenv("ADMIN_PASSWORD"),
+		AuthCookieSecure:        boolValue("AUTH_COOKIE_SECURE", false),
 		EventOutboxDir:          os.Getenv("EVENT_OUTBOX_DIR"),
 		DSMNotificationsEnabled: boolValue("DSM_NOTIFICATIONS_ENABLED", false),
 	}

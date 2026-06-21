@@ -95,13 +95,21 @@ export default function Users() {
       ]} />
       <Modal title={editing ? 'Edit User' : 'Add User'} open={open} onOk={save} confirmLoading={saving} onCancel={() => setOpen(false)}>
         <Form layout="vertical" form={form}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+          <Form.Item
+            name="username"
+            label="Username"
+            rules={[
+              { required: true },
+              { max: 64 },
+              { pattern: /^[A-Za-z0-9._@-]+$/, message: 'Use letters, numbers, dot, dash, underscore, or @' },
+            ]}
+          >
             <Input autoComplete="off" />
           </Form.Item>
           <Form.Item
             name="password"
             label={editing ? 'New password' : 'Password'}
-            rules={editing ? [] : [{ required: true }, { min: 8 }]}
+            rules={editing ? [{ max: 72 }] : [{ required: true }, { min: 8 }, { max: 72 }]}
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>

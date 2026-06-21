@@ -108,3 +108,58 @@ func TestSettingsHandlerPersistsMonitoringDisabled(t *testing.T) {
 		t.Fatalf("expected monitoring disabled, got %#v", got)
 	}
 }
+
+func TestRejectsCrossOriginWrites(t *testing.T) {
+	_, st := testutil.DB(t)
+	authService := auth.NewService(st)
+	if err := authService.EnsureInitialAdmin(context.Background(), "admin", "password123"); err != nil {
+		t.Fatal(err)
+	}
+	server := httpapi.New(st, monitoring.NewService(st, slog.Default()), authService, slog.Default(), t.TempDir()).Routes()
+
+	req := httptest.NewRequest(http.MethodPost, "http://homelink.local/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"password123"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://attacker.local")
+	res := httptest.NewRecorder()
+	server.ServeHTTP(res, req)
+
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden, got %d body %s", res.Code, res.Body.String())
+	}
+}
+
+func TestCreateUserRejectsUnsupportedRole(t *testing.T) {
+	_, st := testutil.DB(t)
+	authService := auth.NewService(st)
+	if err := authService.EnsureInitialAdmin(context.Background(), "admin", "password123"); err != nil {
+		t.Fatal(err)
+	}
+	server := httpapi.New(st, monitoring.NewService(st, slog.Default()), authService, slog.Default(), t.TempDir()).Routes()
+	cookie := loginCookie(t, server)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/users", bytes.NewBufferString(`{"username":"viewer","password":"password123","role":"viewer"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	res := httptest.NewRecorder()
+	server.ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request, got %d body %s", res.Code, res.Body.String())
+	}
+}
+
+func loginCookie(t *testing.T, handler http.Handler) *http.Cookie {
+	t.Helper()
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"password123"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRes := httptest.NewRecorder()
+	handler.ServeHTTP(loginRes, loginReq)
+	if loginRes.Code != http.StatusOK {
+		t.Fatalf("login status %d body %s", loginRes.Code, loginRes.Body.String())
+	}
+	cookies := loginRes.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie")
+	}
+	return cookies[0]
+}

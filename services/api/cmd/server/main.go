@@ -35,6 +35,7 @@ func main() {
 
 	st := store.New(database)
 	authService := auth.NewService(st)
+	authService.SetCookieSecure(cfg.AuthCookieSecure)
 	if err := authService.EnsureInitialAdmin(ctx, cfg.AdminUsername, cfg.AdminPassword); err != nil {
 		log.Error("seed initial admin", "error", err)
 		os.Exit(1)
@@ -49,6 +50,9 @@ func main() {
 		Addr:              cfg.Addr,
 		Handler:           httpapi.New(st, monitor, authService, log, cfg.StaticPath).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -56,8 +57,10 @@ func (s *Server) Routes() http.Handler {
 		ContentTypeNosniff:    "nosniff",
 		XFrameOptions:         "SAMEORIGIN",
 		ReferrerPolicy:        "same-origin",
-		ContentSecurityPolicy: "",
+		ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
 	}))
+	e.Use(middleware.BodyLimit("1M"))
+	e.Use(sameOriginMiddleware)
 
 	e.GET("/api/health", s.health)
 	e.POST("/api/auth/login", s.login)
@@ -107,7 +110,7 @@ func (s *Server) login(c echo.Context) error {
 	if err != nil {
 		return writeError(c, http.StatusUnauthorized, err)
 	}
-	auth.SetSessionCookie(c.Response(), token)
+	s.auth.SetSessionCookie(c.Response(), token)
 	return c.JSON(http.StatusOK, map[string]any{"user": user})
 }
 
@@ -117,7 +120,7 @@ func (s *Server) logout(c echo.Context) error {
 			return writeError(c, http.StatusInternalServerError, err)
 		}
 	}
-	auth.ClearSessionCookie(c.Response())
+	s.auth.ClearSessionCookie(c.Response())
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -234,8 +237,8 @@ func (s *Server) createUser(c echo.Context) error {
 		return writeError(c, http.StatusBadRequest, err)
 	}
 	req.normalize()
-	if req.Username == "" {
-		return writeError(c, http.StatusBadRequest, errors.New("username is required"))
+	if err := validateUserRequest(req, true); err != nil {
+		return writeError(c, http.StatusBadRequest, err)
 	}
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
@@ -259,8 +262,8 @@ func (s *Server) updateUser(c echo.Context) error {
 		return writeError(c, http.StatusBadRequest, err)
 	}
 	req.normalize()
-	if req.Username == "" {
-		return writeError(c, http.StatusBadRequest, errors.New("username is required"))
+	if err := validateUserRequest(req, false); err != nil {
+		return writeError(c, http.StatusBadRequest, err)
 	}
 	var hash *string
 	if req.Password != "" {
@@ -272,6 +275,11 @@ func (s *Server) updateUser(c echo.Context) error {
 	}
 	if err := s.store.UpdateUser(c.Request().Context(), id, req.Username, req.Role, hash, time.Now().UTC()); err != nil {
 		return writeError(c, http.StatusBadRequest, err)
+	}
+	if hash != nil {
+		if err := s.store.DeleteSessionsForUser(c.Request().Context(), id); err != nil {
+			return writeError(c, http.StatusInternalServerError, err)
+		}
 	}
 	user, err := s.store.UserByID(c.Request().Context(), id)
 	return respond(c, user, err)
@@ -304,13 +312,20 @@ func (s *Server) static(c echo.Context) error {
 	if strings.HasPrefix(path, "/api/") {
 		return writeError(c, http.StatusNotFound, errors.New("not found"))
 	}
+	root, err := filepath.Abs(s.staticDir)
+	if err != nil {
+		return writeError(c, http.StatusInternalServerError, err)
+	}
 	clean := strings.TrimPrefix(filepath.Clean(path), string(filepath.Separator))
-	filePath := filepath.Join(s.staticDir, clean)
-	if path == "/" {
-		filePath = filepath.Join(s.staticDir, "index.html")
+	filePath := filepath.Join(root, clean)
+	if path == "/" || clean == "." {
+		filePath = filepath.Join(root, "index.html")
+	}
+	if !pathInside(root, filePath) {
+		return writeError(c, http.StatusNotFound, errors.New("not found"))
 	}
 	if _, err := os.Stat(filePath); err != nil {
-		filePath = filepath.Join(s.staticDir, "index.html")
+		filePath = filepath.Join(root, "index.html")
 	}
 	return c.File(filePath)
 }
@@ -342,21 +357,89 @@ func (r *userRequest) normalize() {
 	if r.Role == "" {
 		r.Role = "admin"
 	}
+	r.Role = strings.TrimSpace(r.Role)
+}
+
+func validateUserRequest(req userRequest, passwordRequired bool) error {
+	if err := auth.ValidateUsername(req.Username); err != nil {
+		return err
+	}
+	if req.Role != "admin" {
+		return errors.New("unsupported role")
+	}
+	if passwordRequired && req.Password == "" {
+		return errors.New("password is required")
+	}
+	return nil
 }
 
 func normalizeSettings(s *domain.Settings) {
+	s.SpeedTestCommand = strings.TrimSpace(s.SpeedTestCommand)
+	if len(s.SpeedTestCommand) > 500 {
+		s.SpeedTestCommand = s.SpeedTestCommand[:500]
+	}
+	s.LatencyTargets = normalizeStringList(s.LatencyTargets, 20, 255)
+	s.DNSDomains = normalizeStringList(s.DNSDomains, 20, 255)
+	s.RouterIP = strings.TrimSpace(s.RouterIP)
+	if len(s.RouterIP) > 255 {
+		s.RouterIP = s.RouterIP[:255]
+	}
 	if s.SpeedTestScheduleMinutes < 0 {
 		s.SpeedTestScheduleMinutes = 0
+	}
+	if s.SpeedTestScheduleMinutes > 10080 {
+		s.SpeedTestScheduleMinutes = 10080
 	}
 	if s.LatencyIntervalSeconds < 10 {
 		s.LatencyIntervalSeconds = 10
 	}
+	if s.LatencyIntervalSeconds > 86400 {
+		s.LatencyIntervalSeconds = 86400
+	}
 	if s.DNSIntervalSeconds < 10 {
 		s.DNSIntervalSeconds = 10
+	}
+	if s.DNSIntervalSeconds > 86400 {
+		s.DNSIntervalSeconds = 86400
 	}
 	if s.OutageFailureThreshold < 1 {
 		s.OutageFailureThreshold = 1
 	}
+	if s.OutageFailureThreshold > 100 {
+		s.OutageFailureThreshold = 100
+	}
+	if s.MinDownloadMbps < 0 {
+		s.MinDownloadMbps = 0
+	}
+	if s.MinUploadMbps < 0 {
+		s.MinUploadMbps = 0
+	}
+	if s.MaxLatencyMs < 0 {
+		s.MaxLatencyMs = 0
+	}
+}
+
+func normalizeStringList(values []string, maxItems, maxLen int) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if len(value) > maxLen {
+			value = value[:maxLen]
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+		if len(out) >= maxItems {
+			break
+		}
+	}
+	return out
 }
 
 func respond(c echo.Context, value any, err error) error {
@@ -404,4 +487,37 @@ func timeParam(c echo.Context, key string) (*time.Time, error) {
 
 func pathID(c echo.Context) (int64, error) {
 	return strconv.ParseInt(c.Param("id"), 10, 64)
+}
+
+func sameOriginMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		method := c.Request().Method
+		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+			return next(c)
+		}
+		origin := c.Request().Header.Get("Origin")
+		if origin == "" {
+			return next(c)
+		}
+		if !sameOrigin(origin, c.Request().Host) {
+			return writeError(c, http.StatusForbidden, errors.New("cross-origin request rejected"))
+		}
+		return next(c)
+	}
+}
+
+func sameOrigin(origin, host string) bool {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Host, host) && (u.Scheme == "http" || u.Scheme == "https")
+}
+
+func pathInside(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

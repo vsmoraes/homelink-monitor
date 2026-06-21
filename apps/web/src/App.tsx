@@ -1,19 +1,20 @@
 import { DashboardOutlined, DatabaseOutlined, GlobalOutlined, LogoutOutlined, MenuOutlined, SettingOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from '@ant-design/icons';
 import { Button, Drawer, Grid, Layout, Menu, Space, Spin, Typography, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { api } from './api/client';
-import Dashboard from './pages/Dashboard';
-import DNS from './pages/DNS';
-import Latency from './pages/Latency';
 import Login from './pages/Login';
-import Outages from './pages/Outages';
-import SettingsPage from './pages/Settings';
-import SpeedTests from './pages/SpeedTests';
-import Users from './pages/Users';
 import type { User } from './types';
 
 const { Header, Content } = Layout;
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const SpeedTests = lazy(() => import('./pages/SpeedTests'));
+const Latency = lazy(() => import('./pages/Latency'));
+const DNS = lazy(() => import('./pages/DNS'));
+const Outages = lazy(() => import('./pages/Outages'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const Users = lazy(() => import('./pages/Users'));
 
 const items = [
   { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
@@ -91,15 +92,17 @@ export default function App() {
       </Drawer>
       <Layout>
         <Content className="app-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/speed-tests" element={<SpeedTests />} />
-            <Route path="/latency" element={<Latency />} />
-            <Route path="/dns" element={<DNS />} />
-            <Route path="/outages" element={<Outages />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/users" element={<Users />} />
-          </Routes>
+          <Suspense fallback={<div className="center-screen"><Spin /></div>}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/speed-tests" element={<SpeedTests />} />
+              <Route path="/latency" element={<Latency />} />
+              <Route path="/dns" element={<DNS />} />
+              <Route path="/outages" element={<Outages />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/users" element={<Users />} />
+            </Routes>
+          </Suspense>
         </Content>
       </Layout>
     </Layout>

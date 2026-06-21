@@ -1,5 +1,10 @@
 .git
+.env
+app.env
 data
+build
+dist
+*.spk
 services/api/connection-monitor.db
 apps/web/node_modules
 apps/web/dist
