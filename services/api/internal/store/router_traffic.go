@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"homelink-monitor/services/api/internal/domain"
 )
@@ -57,61 +56,6 @@ func (s *Store) RouterTrafficSamples(ctx context.Context, limit int) ([]domain.R
 	return out, rows.Err()
 }
 
-func (s *Store) RouterTrafficClientUsageSince(ctx context.Context, since time.Time) (map[string]domain.RouterTrafficClient, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT checked_at, clients_json
-		FROM router_traffic_samples
-		WHERE success = 1 AND checked_at >= ?
-		ORDER BY checked_at ASC, id ASC`, ts(since))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	usage := map[string]domain.RouterTrafficClient{}
-	var previousAt *time.Time
-	for rows.Next() {
-		var checkedRaw string
-		var clientsJSON string
-		if err := rows.Scan(&checkedRaw, &clientsJSON); err != nil {
-			return nil, err
-		}
-		checkedAt, err := parseTS(checkedRaw)
-		if err != nil {
-			return nil, err
-		}
-		clients := []domain.RouterTrafficClient{}
-		if clientsJSON != "" {
-			if err := json.Unmarshal([]byte(clientsJSON), &clients); err != nil {
-				return nil, err
-			}
-		}
-		if previousAt != nil {
-			seconds := checkedAt.Sub(*previousAt).Seconds()
-			if seconds > 0 && seconds < 3600 {
-				for _, client := range clients {
-					key := routerClientKey(client)
-					if key == "" {
-						continue
-					}
-					current := usage[key]
-					current = mergeRouterClientIdentity(current, client)
-					if client.DownloadBps != nil {
-						download := valueOrZero(current.DownloadBytes) + (*client.DownloadBps * seconds)
-						current.DownloadBytes = &download
-					}
-					if client.UploadBps != nil {
-						upload := valueOrZero(current.UploadBytes) + (*client.UploadBps * seconds)
-						current.UploadBytes = &upload
-					}
-					usage[key] = current
-				}
-			}
-		}
-		previousAt = &checkedAt
-	}
-	return usage, rows.Err()
-}
-
 func scanRouterTraffic(row scanner) (*domain.RouterTrafficSample, []domain.RouterTrafficClient, error) {
 	var sample domain.RouterTrafficSample
 	var checked string
@@ -144,37 +88,4 @@ func scanRouterTraffic(row scanner) (*domain.RouterTrafficSample, []domain.Route
 		}
 	}
 	return &sample, clients, nil
-}
-
-func routerClientKey(client domain.RouterTrafficClient) string {
-	if client.MAC != "" {
-		return client.MAC
-	}
-	if client.IP != "" {
-		return client.IP
-	}
-	return client.Hostname
-}
-
-func mergeRouterClientIdentity(a, b domain.RouterTrafficClient) domain.RouterTrafficClient {
-	if a.MAC == "" {
-		a.MAC = b.MAC
-	}
-	if a.IP == "" {
-		a.IP = b.IP
-	}
-	if a.Hostname == "" {
-		a.Hostname = b.Hostname
-	}
-	if a.Connection == "" {
-		a.Connection = b.Connection
-	}
-	return a
-}
-
-func valueOrZero(value *float64) float64 {
-	if value == nil {
-		return 0
-	}
-	return *value
 }

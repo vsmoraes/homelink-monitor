@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -232,7 +231,6 @@ func (s *Server) currentRouterTraffic(c echo.Context) error {
 		capability.CheckedAt = latest.CheckedAt
 		capability.Error = latest.Error
 	}
-	clients = s.withRouterDailyUsage(c.Request().Context(), clients)
 	if !settings.RouterTrafficEnabled {
 		capability.Error = "router traffic monitoring is disabled"
 	}
@@ -253,47 +251,11 @@ func (s *Server) probeRouterTraffic(c echo.Context) error {
 	if clients == nil {
 		clients = []domain.RouterTrafficClient{}
 	}
-	clients = s.withRouterDailyUsage(c.Request().Context(), clients)
 	return c.JSON(http.StatusOK, domain.RouterTrafficCurrent{
 		Capability: snapshot.Capability,
 		Latest:     &snapshot.Sample,
 		Clients:    clients,
 	})
-}
-
-func (s *Server) withRouterDailyUsage(ctx context.Context, clients []domain.RouterTrafficClient) []domain.RouterTrafficClient {
-	if len(clients) == 0 {
-		return clients
-	}
-	now := time.Now().UTC()
-	usage, err := s.store.RouterTrafficClientUsageSince(ctx, time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC))
-	if err != nil {
-		s.log.Warn("load router daily usage", "error", err)
-		return clients
-	}
-	out := make([]domain.RouterTrafficClient, len(clients))
-	for i, client := range clients {
-		out[i] = client
-		if daily, ok := usage[routerClientKey(client)]; ok {
-			if out[i].DownloadBytes == nil {
-				out[i].DownloadBytes = daily.DownloadBytes
-			}
-			if out[i].UploadBytes == nil {
-				out[i].UploadBytes = daily.UploadBytes
-			}
-		}
-	}
-	return out
-}
-
-func routerClientKey(client domain.RouterTrafficClient) string {
-	if client.MAC != "" {
-		return client.MAC
-	}
-	if client.IP != "" {
-		return client.IP
-	}
-	return client.Hostname
 }
 
 func (s *Server) outages(c echo.Context) error {

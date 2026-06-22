@@ -27,7 +27,6 @@ const clientSortKey = (client: RouterTrafficClient) =>
 const textSorter = <T,>(pick: (row: T) => string | undefined) => (a: T, b: T) =>
   (pick(a) || '').localeCompare(pick(b) || '');
 const rateTotal = (client: RouterTrafficClient) => (client.downloadBps ?? 0) + (client.uploadBps ?? 0);
-const usageTotal = (client: RouterTrafficClient) => (client.downloadBytes ?? 0) + (client.uploadBytes ?? 0);
 const downColor = '#18c98f';
 const upColor = '#13b8c8';
 
@@ -182,13 +181,8 @@ export default function RouterTraffic() {
               },
               {
                 title: 'Today',
-                sorter: (a, b) => usageTotal(a) - usageTotal(b),
-                render: (_, r) => (
-                  <Space direction="vertical" size={0}>
-                    <span style={{ color: downColor }}><ArrowDownOutlined /> {bytes(r.downloadBytes)}</span>
-                    <span style={{ color: upColor }}><ArrowUpOutlined /> {bytes(r.uploadBytes)}</span>
-                  </Space>
-                ),
+                render: (_, r) => bytes(r.totalBytes),
+                sorter: (a, b) => (a.totalBytes ?? -1) - (b.totalBytes ?? -1),
               },
             ]}
           />

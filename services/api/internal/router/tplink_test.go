@@ -169,6 +169,7 @@ func TestExtractClientsDetectsBE550CamelCaseRates(t *testing.T) {
 					"deviceName":    "laptop",
 					"downloadSpeed": float64(1250),
 					"uploadSpeed":   float64(250),
+					"trafficUsage":  float64(8192),
 				},
 			},
 		},
@@ -180,6 +181,7 @@ func TestExtractClientsDetectsBE550CamelCaseRates(t *testing.T) {
 	}
 	assertFloatPtr(t, clients[0].DownloadBps, 1250)
 	assertFloatPtr(t, clients[0].UploadBps, 250)
+	assertFloatPtr(t, clients[0].TotalBytes, 8192)
 }
 
 func assertFormBody(t *testing.T, got, want string) {
