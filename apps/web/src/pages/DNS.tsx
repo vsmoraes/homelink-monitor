@@ -1,4 +1,4 @@
-import { Card, Select, Space, Table } from 'antd';
+import { Card, Space, Table } from 'antd';
 import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
@@ -8,12 +8,11 @@ import type { DNSCheck } from '../types';
 import { localTime, ms } from '../utils/format';
 
 const colors = ['#18c98f', '#13b8c8'];
-const allSeries = '__all__';
 const seriesKey = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '_');
 
 export default function DNS() {
   const [items, setItems] = useState<DNSCheck[]>([]);
-  const [focusedDomain, setFocusedDomain] = useState(allSeries);
+  const [hiddenSeries, setHiddenSeries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   useEffect(() => {
@@ -24,35 +23,25 @@ export default function DNS() {
     time: localTime(item.checkedAt),
     [seriesKey(item.domain)]: item.durationMs,
   }));
-  const focusedChart = [...items]
-    .reverse()
-    .filter((item) => item.success && item.domain === focusedDomain)
-    .map((item) => ({ time: localTime(item.checkedAt), value: item.durationMs }));
-  const chart = focusedDomain === allSeries ? allChart : focusedChart;
+  const toggleSeries = (key: string) => {
+    setHiddenSeries(hiddenSeries.includes(key) ? hiddenSeries.filter((item) => item !== key) : [...hiddenSeries, key]);
+  };
   return (
     <Page title="DNS" loading={loading} error={error}>
       <Space direction="vertical" size="large" className="full-width">
-        <Card
-          extra={
-            <Select
-              value={focusedDomain}
-              onChange={setFocusedDomain}
-              className="chart-focus-select"
-              options={[{ value: allSeries, label: 'All domains' }, ...domains.map((value) => ({ value, label: value }))]}
-            />
-          }
-        >
+        <Card>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chart}>
+            <LineChart data={allChart}>
               <XAxis dataKey="time" hide />
               <YAxis />
               <Tooltip />
-              {focusedDomain === allSeries ? <Legend /> : null}
-              {focusedDomain === allSeries
-                ? domains.map((domain, index) => (
-                  <Line key={domain} type="monotone" dataKey={seriesKey(domain)} name={domain} stroke={colors[index % colors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} connectNulls />
-                ))
-                : <Line type="monotone" dataKey="value" name={focusedDomain} stroke={colors[0]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} />}
+              <Legend onClick={(item) => toggleSeries(String(item.dataKey))} />
+              {domains.map((domain, index) => {
+                const key = seriesKey(domain);
+                return (
+                  <Line key={domain} type="monotone" dataKey={key} name={domain} stroke={colors[index % colors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} connectNulls hide={hiddenSeries.includes(key)} />
+                );
+              })}
             </LineChart>
           </ResponsiveContainer>
         </Card>

@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Space, Switch, Typography, message } from 'antd';
-import { FieldTimeOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined, WifiOutlined } from '@ant-design/icons';
+import { FieldTimeOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined, WifiOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import Page from '../components/Page';
@@ -177,6 +177,44 @@ export default function SettingsPage() {
                     </Form.Item>
                   </Col>
                 </Row>
+              </Card>
+            </Col>
+
+            <Col xs={24}>
+              <Card title={<Space><ApartmentOutlined />TP-Link router traffic</Space>} className={`settings-card ${monitoringEnabled ? '' : 'settings-card-disabled'}`}>
+                <Row gutter={16}>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="routerTrafficEnabled" label="Collect router traffic" valuePropName="checked">
+                      <Switch disabled={!monitoringEnabled} checkedChildren="Enabled" unCheckedChildren="Off" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="routerTrafficIntervalSeconds" label="Run every">
+                      <InputNumber min={10} addonAfter="seconds" className="full-width" disabled={!monitoringEnabled} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item name="routerTrafficUsername" label="Local username">
+                      <Input disabled={!monitoringEnabled} placeholder="admin" autoComplete="off" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="routerTrafficUrl" label="Router URL">
+                      <Input disabled={!monitoringEnabled} placeholder="http://192.168.1.1" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item name="routerTrafficPassword" label="Local password">
+                      <Input.Password disabled={!monitoringEnabled} autoComplete="new-password" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Traffic dimensions are detected from the router response."
+                  description="Download and upload charts appear only when the TP-Link API returns separate values. If the router exposes only total traffic, HomeLink Monitor stores and displays total traffic only."
+                />
               </Card>
             </Col>
           </Row>

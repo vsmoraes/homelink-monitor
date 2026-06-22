@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Space, Table, Typography, message } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import Page from '../components/Page';
@@ -11,6 +11,7 @@ import { localTime, mbps, ms } from '../utils/format';
 export default function SpeedTests() {
   const [items, setItems] = useState<SpeedTest[]>([]);
   const [summary, setSummary] = useState<Summary>();
+  const [hiddenSeries, setHiddenSeries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -49,6 +50,9 @@ export default function SpeedTests() {
     }
   };
   const chart = [...items].reverse().map((item) => ({ time: localTime(item.startedAt), download: item.downloadMbps, upload: item.uploadMbps }));
+  const toggleSeries = (key: string) => {
+    setHiddenSeries(hiddenSeries.includes(key) ? hiddenSeries.filter((item) => item !== key) : [...hiddenSeries, key]);
+  };
   return (
     <Page
       title="Speed Tests"
@@ -92,8 +96,9 @@ export default function SpeedTests() {
               <XAxis dataKey="time" hide />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="download" stroke="#1677ff" dot={false} />
-              <Line type="monotone" dataKey="upload" stroke="#52c41a" dot={false} />
+              <Legend onClick={(item) => toggleSeries(String(item.dataKey))} />
+              <Line type="monotone" dataKey="download" name="Download Mbps" stroke="#18c98f" strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} hide={hiddenSeries.includes('download')} />
+              <Line type="monotone" dataKey="upload" name="Upload Mbps" stroke="#13b8c8" strokeWidth={1.5} dot={false} activeDot={{ r: 5 }} hide={hiddenSeries.includes('upload')} />
             </LineChart>
           </ResponsiveContainer>
         </Card>

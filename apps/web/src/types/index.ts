@@ -43,6 +43,11 @@ export type Settings = {
   speedTestCommand: string;
   latencyIntervalSeconds: number;
   dnsIntervalSeconds: number;
+  routerTrafficEnabled: boolean;
+  routerTrafficIntervalSeconds: number;
+  routerTrafficUrl?: string;
+  routerTrafficUsername?: string;
+  routerTrafficPassword?: string;
   latencyTargets: string[];
   dnsDomains: string[];
   routerIp: string;
@@ -75,6 +80,53 @@ export type Summary = {
   maxUpload24hMbps?: number;
   settings: Settings;
   speedTestIsRunning: boolean;
+};
+
+export type RouterTrafficSample = {
+  id: number;
+  checkedAt: string;
+  provider: string;
+  success: boolean;
+  error?: string;
+  clientCount: number;
+  downloadBps?: number;
+  uploadBps?: number;
+  totalBps?: number;
+  downloadAvailable: boolean;
+  uploadAvailable: boolean;
+  totalTrafficAvailable: boolean;
+};
+
+export type RouterTrafficClient = {
+  mac?: string;
+  ip?: string;
+  hostname?: string;
+  connection?: string;
+  downloadBps?: number;
+  uploadBps?: number;
+  totalBps?: number;
+  downloadBytes?: number;
+  uploadBytes?: number;
+  totalBytes?: number;
+};
+
+export type RouterTrafficCapability = {
+  provider: string;
+  checkedAt: string;
+  reachable: boolean;
+  authenticated: boolean;
+  clientListAvailable: boolean;
+  downloadAvailable: boolean;
+  uploadAvailable: boolean;
+  totalTrafficAvailable: boolean;
+  error?: string;
+  sources?: string[];
+};
+
+export type RouterTrafficCurrent = {
+  capability: RouterTrafficCapability;
+  latest?: RouterTrafficSample;
+  clients: RouterTrafficClient[];
 };
 
 export type User = {

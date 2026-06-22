@@ -1,4 +1,4 @@
-import { DashboardOutlined, DatabaseOutlined, GlobalOutlined, LogoutOutlined, MenuOutlined, SettingOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from '@ant-design/icons';
+import { DashboardOutlined, DatabaseOutlined, GlobalOutlined, LogoutOutlined, MenuOutlined, SettingOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { Button, Drawer, Grid, Layout, Menu, Space, Spin, Typography, message } from 'antd';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const SpeedTests = lazy(() => import('./pages/SpeedTests'));
 const Latency = lazy(() => import('./pages/Latency'));
 const DNS = lazy(() => import('./pages/DNS'));
+const RouterTraffic = lazy(() => import('./pages/RouterTraffic'));
 const Outages = lazy(() => import('./pages/Outages'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const Users = lazy(() => import('./pages/Users'));
@@ -21,6 +22,7 @@ const items = [
   { key: '/speed-tests', icon: <ThunderboltOutlined />, label: <Link to="/speed-tests">Speed Tests</Link> },
   { key: '/latency', icon: <GlobalOutlined />, label: <Link to="/latency">Latency</Link> },
   { key: '/dns', icon: <DatabaseOutlined />, label: <Link to="/dns">DNS</Link> },
+  { key: '/router-traffic', icon: <ApartmentOutlined />, label: <Link to="/router-traffic">Router</Link> },
   { key: '/outages', icon: <WarningOutlined />, label: <Link to="/outages">Outages</Link> },
   { key: '/settings', icon: <SettingOutlined />, label: <Link to="/settings">Settings</Link> },
   { key: '/users', icon: <TeamOutlined />, label: <Link to="/users">Users</Link> },
@@ -98,6 +100,7 @@ export default function App() {
               <Route path="/speed-tests" element={<SpeedTests />} />
               <Route path="/latency" element={<Latency />} />
               <Route path="/dns" element={<DNS />} />
+              <Route path="/router-traffic" element={<RouterTraffic />} />
               <Route path="/outages" element={<Outages />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/users" element={<Users />} />

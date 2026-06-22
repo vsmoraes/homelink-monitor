@@ -6,6 +6,22 @@ export function mbps(value?: number): string {
   return value === undefined || value === null ? '—' : `${number(value)} Mbps`;
 }
 
+export function bpsToMbps(value?: number): string {
+  return value === undefined || value === null ? '—' : `${number((value * 8) / 1_000_000)} Mbps`;
+}
+
+export function bytes(value?: number): string {
+  if (value === undefined || value === null) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let next = value;
+  let unit = 0;
+  while (next >= 1024 && unit < units.length - 1) {
+    next /= 1024;
+    unit += 1;
+  }
+  return `${next.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
 export function ms(value?: number): string {
   return value === undefined || value === null ? '—' : `${number(value)} ms`;
 }
