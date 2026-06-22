@@ -26,6 +26,7 @@ It tracks latency, DNS health, speed tests, outages, and connection status over 
 - Synology-like connection dashboard.
 - Latency checks per target.
 - DNS checks per domain.
+- Optional TP-Link Archer router client traffic collection.
 - Manual and scheduled Ookla speed tests.
 - Outage detection.
 - Local users and login.
@@ -185,8 +186,32 @@ Speed test failed:
 Check Settings -> speed test command and verify the CLI exists inside the container.
 ```
 
+TP-Link router traffic is empty:
+
+```text
+Enable Settings -> TP-Link router traffic, use the local router password, and confirm the router web API returns client traffic fields.
+```
+
 Cannot open the UI:
 
 ```text
 Confirm host port 8810 maps to container port 8080 and your firewall allows LAN access.
 ```
+
+## TP-Link Router Traffic
+
+HomeLink Monitor can poll local TP-Link Archer-style router APIs for connected clients and client traffic rates.
+
+The implementation is capability-based:
+
+- It probes known TP-Link web API endpoints used by Archer C6U/C80/AX/BE-family community tooling.
+- It stores connected client traffic over time when the router returns usable client traffic fields.
+- It exposes download/upload only when separate values are present.
+- If the router exposes only total traffic, only total traffic is stored/displayed.
+- If the router shape is unsupported, the UI reports the unavailable capability instead of guessing.
+
+References used for the first adapter:
+
+- [`AlexandrErohin/TP-Link-Archer-C6U`](https://github.com/AlexandrErohin/TP-Link-Archer-C6U)
+- [`loliver1823/tplink-archer-be400-cli`](https://github.com/loliver1823/tplink-archer-be400-cli)
+- [`hertzg/node-tplink-api`](https://github.com/hertzg/node-tplink-api)
