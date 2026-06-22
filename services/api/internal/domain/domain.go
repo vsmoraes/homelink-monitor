@@ -7,6 +7,11 @@ type Settings struct {
 	SpeedTestCommand         string   `json:"speedTestCommand"`
 	LatencyIntervalSeconds   int      `json:"latencyIntervalSeconds"`
 	DNSIntervalSeconds       int      `json:"dnsIntervalSeconds"`
+	RouterTrafficEnabled     bool     `json:"routerTrafficEnabled"`
+	RouterTrafficIntervalSec int      `json:"routerTrafficIntervalSeconds"`
+	RouterTrafficURL         string   `json:"routerTrafficUrl,omitempty"`
+	RouterTrafficUsername    string   `json:"routerTrafficUsername,omitempty"`
+	RouterTrafficPassword    string   `json:"routerTrafficPassword,omitempty"`
 	LatencyTargets           []string `json:"latencyTargets"`
 	DNSDomains               []string `json:"dnsDomains"`
 	RouterIP                 string   `json:"routerIp"`
@@ -23,6 +28,8 @@ func DefaultSettings() Settings {
 		SpeedTestCommand:         "speedtest --accept-license --accept-gdpr --format=json",
 		LatencyIntervalSeconds:   60,
 		DNSIntervalSeconds:       120,
+		RouterTrafficEnabled:     false,
+		RouterTrafficIntervalSec: 60,
 		LatencyTargets:           []string{"1.1.1.1:53", "8.8.8.8:53"},
 		DNSDomains:               []string{"google.com", "cloudflare.com"},
 		MinDownloadMbps:          50,
@@ -64,6 +71,53 @@ type DNSCheck struct {
 	DurationMs *float64  `json:"durationMs,omitempty"`
 	Success    bool      `json:"success"`
 	Error      string    `json:"error,omitempty"`
+}
+
+type RouterTrafficSample struct {
+	ID                    int64     `json:"id"`
+	CheckedAt             time.Time `json:"checkedAt"`
+	Provider              string    `json:"provider"`
+	Success               bool      `json:"success"`
+	Error                 string    `json:"error,omitempty"`
+	ClientCount           int       `json:"clientCount"`
+	DownloadBps           *float64  `json:"downloadBps,omitempty"`
+	UploadBps             *float64  `json:"uploadBps,omitempty"`
+	TotalBps              *float64  `json:"totalBps,omitempty"`
+	DownloadAvailable     bool      `json:"downloadAvailable"`
+	UploadAvailable       bool      `json:"uploadAvailable"`
+	TotalTrafficAvailable bool      `json:"totalTrafficAvailable"`
+}
+
+type RouterTrafficClient struct {
+	MAC           string   `json:"mac,omitempty"`
+	IP            string   `json:"ip,omitempty"`
+	Hostname      string   `json:"hostname,omitempty"`
+	Connection    string   `json:"connection,omitempty"`
+	DownloadBps   *float64 `json:"downloadBps,omitempty"`
+	UploadBps     *float64 `json:"uploadBps,omitempty"`
+	TotalBps      *float64 `json:"totalBps,omitempty"`
+	DownloadBytes *float64 `json:"downloadBytes,omitempty"`
+	UploadBytes   *float64 `json:"uploadBytes,omitempty"`
+	TotalBytes    *float64 `json:"totalBytes,omitempty"`
+}
+
+type RouterTrafficCapability struct {
+	Provider              string    `json:"provider"`
+	CheckedAt             time.Time `json:"checkedAt"`
+	Reachable             bool      `json:"reachable"`
+	Authenticated         bool      `json:"authenticated"`
+	ClientListAvailable   bool      `json:"clientListAvailable"`
+	DownloadAvailable     bool      `json:"downloadAvailable"`
+	UploadAvailable       bool      `json:"uploadAvailable"`
+	TotalTrafficAvailable bool      `json:"totalTrafficAvailable"`
+	Error                 string    `json:"error,omitempty"`
+	Sources               []string  `json:"sources,omitempty"`
+}
+
+type RouterTrafficCurrent struct {
+	Capability RouterTrafficCapability `json:"capability"`
+	Latest     *RouterTrafficSample    `json:"latest,omitempty"`
+	Clients    []RouterTrafficClient   `json:"clients"`
 }
 
 type Outage struct {

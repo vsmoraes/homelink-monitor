@@ -70,6 +70,22 @@ var migrations = []string{
 	);`,
 	`CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);`,
 	`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);`,
+	`CREATE TABLE IF NOT EXISTS router_traffic_samples (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		checked_at TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		success INTEGER NOT NULL,
+		error TEXT,
+		client_count INTEGER NOT NULL,
+		download_bps REAL,
+		upload_bps REAL,
+		total_bps REAL,
+		download_available INTEGER NOT NULL,
+		upload_available INTEGER NOT NULL,
+		total_traffic_available INTEGER NOT NULL,
+		clients_json TEXT NOT NULL
+	);`,
+	`CREATE INDEX IF NOT EXISTS idx_router_traffic_checked_at ON router_traffic_samples(checked_at DESC);`,
 }
 
 func Open(ctx context.Context, path string) (*sql.DB, error) {

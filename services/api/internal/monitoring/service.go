@@ -10,6 +10,7 @@ import (
 
 	"homelink-monitor/services/api/internal/domain"
 	"homelink-monitor/services/api/internal/events"
+	routerprovider "homelink-monitor/services/api/internal/router"
 	"homelink-monitor/services/api/internal/speedtest"
 	"homelink-monitor/services/api/internal/store"
 )
@@ -18,6 +19,7 @@ type Service struct {
 	store       *store.Store
 	log         *slog.Logger
 	speedRunner speedtest.Runner
+	router      *routerprovider.Provider
 	speedMu     sync.Mutex
 	speedActive bool
 	failMu      sync.Mutex
@@ -28,7 +30,7 @@ type Service struct {
 const speedSchedulePollInterval = 30 * time.Second
 
 func NewService(st *store.Store, log *slog.Logger) *Service {
-	return &Service{store: st, log: log, speedRunner: speedtest.Runner{}}
+	return &Service{store: st, log: log, speedRunner: speedtest.Runner{}, router: routerprovider.NewProvider(nil)}
 }
 
 func NewServiceWithOutbox(st *store.Store, log *slog.Logger, outbox *events.Outbox) *Service {
@@ -41,6 +43,14 @@ func (s *Service) SpeedRunning() bool {
 	s.speedMu.Lock()
 	defer s.speedMu.Unlock()
 	return s.speedActive
+}
+
+func (s *Service) ProbeRouterTraffic(ctx context.Context, settings domain.Settings) routerprovider.Snapshot {
+	return s.router.ProbeAndCollect(ctx, routerprovider.Settings{
+		URL:      settings.RouterTrafficURL,
+		Username: settings.RouterTrafficUsername,
+		Password: settings.RouterTrafficPassword,
+	})
 }
 
 func (s *Service) TriggerSpeedTest(_ context.Context) bool {
@@ -108,6 +118,14 @@ func (s *Service) Start(ctx context.Context) {
 			s.TriggerSpeedTest(ctx)
 		}
 		return speedSchedulePollInterval
+	})
+	go s.loop(ctx, "router-traffic", 10*time.Second, func(ctx context.Context) time.Duration {
+		settings, err := s.store.Settings(ctx)
+		if err != nil || !settings.MonitoringEnabled || !settings.RouterTrafficEnabled {
+			return time.Minute
+		}
+		s.checkRouterTraffic(ctx, settings)
+		return time.Duration(settings.RouterTrafficIntervalSec) * time.Second
 	})
 }
 
@@ -192,6 +210,23 @@ func (s *Service) checkDNS(ctx context.Context, settings domain.Settings) {
 				Timestamp: result.CheckedAt,
 			})
 		}
+	}
+}
+
+func (s *Service) checkRouterTraffic(ctx context.Context, settings domain.Settings) {
+	snapshot := s.ProbeRouterTraffic(ctx, settings)
+	if _, err := s.store.InsertRouterTraffic(ctx, snapshot.Sample, snapshot.Clients); err != nil {
+		s.log.Error("store router traffic", "error", err)
+	}
+	if !snapshot.Sample.Success && snapshot.Sample.Error != "" {
+		s.emit(ctx, domain.NotificationEvent{
+			ID:        fmt.Sprintf("router-traffic-failed-%d", snapshot.Sample.CheckedAt.UnixNano()),
+			Severity:  "warning",
+			Metric:    "connection",
+			Title:     "Router traffic check failed",
+			Message:   snapshot.Sample.Error,
+			Timestamp: snapshot.Sample.CheckedAt,
+		})
 	}
 }
 

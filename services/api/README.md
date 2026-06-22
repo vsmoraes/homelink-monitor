@@ -19,3 +19,5 @@ Environment:
 - `ADMIN_USERNAME`: first admin username when the database has no users; required for first boot
 - `ADMIN_PASSWORD`: first admin password when the database has no users; required for first boot
 - `AUTH_COOKIE_SECURE`: set to `true` only when serving over HTTPS
+
+Router traffic monitoring is configured through the normal settings API. It is disabled by default and probes TP-Link Archer-style web API endpoints before exposing traffic dimensions.

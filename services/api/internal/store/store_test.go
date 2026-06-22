@@ -60,3 +60,69 @@ func TestSettingsRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected settings: %#v", got)
 	}
 }
+
+func TestRouterTrafficRoundTrip(t *testing.T) {
+	_, st := testutil.DB(t)
+	ctx := context.Background()
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	down := 1024.0
+	up := 512.0
+	sample := domain.RouterTrafficSample{
+		CheckedAt:         now,
+		Provider:          "tplink-web",
+		Success:           true,
+		ClientCount:       1,
+		DownloadBps:       &down,
+		UploadBps:         &up,
+		DownloadAvailable: true,
+		UploadAvailable:   true,
+	}
+	clients := []domain.RouterTrafficClient{{MAC: "aa:bb:cc:dd:ee:ff", Hostname: "laptop", DownloadBps: &down, UploadBps: &up}}
+	if _, err := st.InsertRouterTraffic(ctx, sample, clients); err != nil {
+		t.Fatal(err)
+	}
+	got, gotClients, err := st.LatestRouterTraffic(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.DownloadBps == nil || *got.DownloadBps != down || !got.DownloadAvailable {
+		t.Fatalf("unexpected sample: %#v", got)
+	}
+	if len(gotClients) != 1 || gotClients[0].MAC != clients[0].MAC {
+		t.Fatalf("unexpected clients: %#v", gotClients)
+	}
+}
+
+func TestRouterTrafficClientUsageSinceIntegratesRates(t *testing.T) {
+	_, st := testutil.DB(t)
+	ctx := context.Background()
+	start := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	down := 100.0
+	up := 50.0
+	client := domain.RouterTrafficClient{MAC: "aa:bb:cc:dd:ee:ff", Hostname: "laptop", DownloadBps: &down, UploadBps: &up}
+	for _, checkedAt := range []time.Time{start, start.Add(10 * time.Second), start.Add(20 * time.Second)} {
+		if _, err := st.InsertRouterTraffic(ctx, domain.RouterTrafficSample{
+			CheckedAt:         checkedAt,
+			Provider:          "tplink-web",
+			Success:           true,
+			ClientCount:       1,
+			DownloadBps:       &down,
+			UploadBps:         &up,
+			DownloadAvailable: true,
+			UploadAvailable:   true,
+		}, []domain.RouterTrafficClient{client}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	usage, err := st.RouterTrafficClientUsageSince(ctx, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := usage[client.MAC]
+	if got.DownloadBytes == nil || *got.DownloadBytes != 2000 {
+		t.Fatalf("unexpected download bytes: %#v", got.DownloadBytes)
+	}
+	if got.UploadBytes == nil || *got.UploadBytes != 1000 {
+		t.Fatalf("unexpected upload bytes: %#v", got.UploadBytes)
+	}
+}

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -76,6 +77,9 @@ func (s *Server) Routes() http.Handler {
 	api.GET("/latency/summary", s.latencySummary)
 	api.GET("/dns-checks", s.dnsChecks)
 	api.GET("/dns-checks/latest", s.latestDNS)
+	api.GET("/router-traffic", s.routerTraffic)
+	api.GET("/router-traffic/current", s.currentRouterTraffic)
+	api.POST("/router-traffic/probe", s.probeRouterTraffic)
 	api.GET("/outages", s.outages)
 	api.GET("/outages/active", s.activeOutage)
 	api.GET("/settings", s.settings)
@@ -199,6 +203,97 @@ func (s *Server) dnsChecks(c echo.Context) error {
 func (s *Server) latestDNS(c echo.Context) error {
 	item, err := s.store.LatestDNS(c.Request().Context())
 	return respond(c, item, err)
+}
+
+func (s *Server) routerTraffic(c echo.Context) error {
+	items, err := s.store.RouterTrafficSamples(c.Request().Context(), intParam(c, "limit", 100, 500))
+	return respond(c, map[string]any{"items": items}, err)
+}
+
+func (s *Server) currentRouterTraffic(c echo.Context) error {
+	settings, err := s.store.Settings(c.Request().Context())
+	if err != nil {
+		return writeError(c, http.StatusInternalServerError, err)
+	}
+	latest, clients, err := s.store.LatestRouterTraffic(c.Request().Context())
+	if err != nil {
+		return writeError(c, http.StatusInternalServerError, err)
+	}
+	capability := domain.RouterTrafficCapability{
+		Provider:              "tplink-web",
+		Reachable:             latest != nil,
+		Authenticated:         latest != nil && latest.Success,
+		ClientListAvailable:   latest != nil && latest.ClientCount > 0,
+		DownloadAvailable:     latest != nil && latest.DownloadAvailable,
+		UploadAvailable:       latest != nil && latest.UploadAvailable,
+		TotalTrafficAvailable: latest != nil && latest.TotalTrafficAvailable,
+	}
+	if latest != nil {
+		capability.CheckedAt = latest.CheckedAt
+		capability.Error = latest.Error
+	}
+	clients = s.withRouterDailyUsage(c.Request().Context(), clients)
+	if !settings.RouterTrafficEnabled {
+		capability.Error = "router traffic monitoring is disabled"
+	}
+	if clients == nil {
+		clients = []domain.RouterTrafficClient{}
+	}
+	return c.JSON(http.StatusOK, domain.RouterTrafficCurrent{Capability: capability, Latest: latest, Clients: clients})
+}
+
+func (s *Server) probeRouterTraffic(c echo.Context) error {
+	settings, err := s.store.Settings(c.Request().Context())
+	if err != nil {
+		return writeError(c, http.StatusInternalServerError, err)
+	}
+	normalizeSettings(&settings)
+	snapshot := s.monitor.ProbeRouterTraffic(c.Request().Context(), settings)
+	clients := snapshot.Clients
+	if clients == nil {
+		clients = []domain.RouterTrafficClient{}
+	}
+	clients = s.withRouterDailyUsage(c.Request().Context(), clients)
+	return c.JSON(http.StatusOK, domain.RouterTrafficCurrent{
+		Capability: snapshot.Capability,
+		Latest:     &snapshot.Sample,
+		Clients:    clients,
+	})
+}
+
+func (s *Server) withRouterDailyUsage(ctx context.Context, clients []domain.RouterTrafficClient) []domain.RouterTrafficClient {
+	if len(clients) == 0 {
+		return clients
+	}
+	now := time.Now().UTC()
+	usage, err := s.store.RouterTrafficClientUsageSince(ctx, time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		s.log.Warn("load router daily usage", "error", err)
+		return clients
+	}
+	out := make([]domain.RouterTrafficClient, len(clients))
+	for i, client := range clients {
+		out[i] = client
+		if daily, ok := usage[routerClientKey(client)]; ok {
+			if out[i].DownloadBytes == nil {
+				out[i].DownloadBytes = daily.DownloadBytes
+			}
+			if out[i].UploadBytes == nil {
+				out[i].UploadBytes = daily.UploadBytes
+			}
+		}
+	}
+	return out
+}
+
+func routerClientKey(client domain.RouterTrafficClient) string {
+	if client.MAC != "" {
+		return client.MAC
+	}
+	if client.IP != "" {
+		return client.IP
+	}
+	return client.Hostname
 }
 
 func (s *Server) outages(c echo.Context) error {
@@ -401,6 +496,23 @@ func normalizeSettings(s *domain.Settings) {
 	}
 	if s.DNSIntervalSeconds > 86400 {
 		s.DNSIntervalSeconds = 86400
+	}
+	if s.RouterTrafficIntervalSec < 10 {
+		s.RouterTrafficIntervalSec = 10
+	}
+	if s.RouterTrafficIntervalSec > 86400 {
+		s.RouterTrafficIntervalSec = 86400
+	}
+	s.RouterTrafficURL = strings.TrimSpace(s.RouterTrafficURL)
+	if len(s.RouterTrafficURL) > 255 {
+		s.RouterTrafficURL = s.RouterTrafficURL[:255]
+	}
+	s.RouterTrafficUsername = strings.TrimSpace(s.RouterTrafficUsername)
+	if len(s.RouterTrafficUsername) > 64 {
+		s.RouterTrafficUsername = s.RouterTrafficUsername[:64]
+	}
+	if len(s.RouterTrafficPassword) > 256 {
+		s.RouterTrafficPassword = s.RouterTrafficPassword[:256]
 	}
 	if s.OutageFailureThreshold < 1 {
 		s.OutageFailureThreshold = 1
