@@ -11,12 +11,12 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
-    "@vitejs/plugin-react": "^6.0.3",
-    "antd": "^6.5.1",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.0.4",
+    "antd": "^6.5.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.1",
-    "recharts": "^3.9.2",
+    "recharts": "^3.10.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.5"
   },
