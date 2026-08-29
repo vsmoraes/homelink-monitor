@@ -6,7 +6,7 @@ COPY apps/web/public ./public
 RUN npm ci
 RUN npm run build
 
-FROM golang:1.26-alpine AS api
+FROM golang:1.27-alpine AS api
 WORKDIR /workspace/services/api
 COPY services/api/go.mod services/api/go.sum ./
 RUN go mod download
